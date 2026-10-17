@@ -151,19 +151,21 @@ function Registro() {
       return;
     }
 
-    // NOMBRE
-    if (!datos.nombre.trim()) {
+        // NOMBRE
+    const soloLetras = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]{2,50}$/;
+
+    if (!soloLetras.test(datos.nombre.trim())) {
       setError(
-        'El nombre es obligatorio.'
+        'El nombre solo puede tener letras (entre 2 y 50 caracteres).'
       );
 
       return;
     }
 
     // APELLIDO
-    if (!datos.apellido.trim()) {
+    if (!soloLetras.test(datos.apellido.trim())) {
       setError(
-        'El apellido es obligatorio.'
+        'El apellido solo puede tener letras (entre 2 y 50 caracteres).'
       );
 
       return;
