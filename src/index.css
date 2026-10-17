@@ -1,0 +1,210 @@
+
+/* ==========================================
+   AROMAESENCIAL - ESTILOS GENERALES
+   ========================================== */
+
+:root {
+  --aroma-fondo: #fff8f5;
+  --aroma-rosa: #f6d5d8;
+  --aroma-rosa-claro: #fce9e8;
+  --aroma-cobre: #b77b50;
+  --aroma-cobre-oscuro: #965e3b;
+  --aroma-oscuro: #34231f;
+  --aroma-blanco: #ffffff;
+}
+
+/* ==========================================
+   ESTILOS GENERALES
+   ========================================== */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background-color: var(--aroma-fondo);
+  color: var(--aroma-oscuro);
+  -webkit-font-smoothing: antialiased;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+a {
+  text-decoration: none;
+}
+
+/* ==========================================
+   NAVBAR PRINCIPAL
+   ========================================== */
+
+.navbar-aroma {
+  background-color: var(--aroma-fondo);
+  border-bottom: 2px solid var(--aroma-rosa);
+  box-shadow: 0 3px 12px rgba(52, 35, 31, 0.08);
+  width: 100%;
+}
+
+/* ==========================================
+   LOGO AROMAESENCIAL
+   ========================================== */
+
+.marca-aroma {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  margin-right: 25px;
+}
+
+.logo-aroma {
+  width: 150px;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+
+/* ==========================================
+   ENLACES DEL NAVBAR
+   ========================================== */
+
+.navbar-aroma .nav-link {
+  color: var(--aroma-oscuro);
+  font-size: 15px;
+  font-weight: 500;
+  margin-right: 8px;
+  transition: color 0.3s ease;
+}
+
+.navbar-aroma .nav-link:hover,
+.navbar-aroma .nav-link:focus {
+  color: var(--aroma-cobre-oscuro);
+}
+
+.navbar-aroma .navbar-text {
+  color: var(--aroma-oscuro);
+}
+
+/* ==========================================
+   BOTONES GENERALES
+   ========================================== */
+
+.btn-aroma {
+  background-color: var(--aroma-cobre);
+  border: 1px solid var(--aroma-cobre);
+  color: var(--aroma-blanco);
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.btn-aroma:hover {
+  background-color: var(--aroma-cobre-oscuro);
+  border-color: var(--aroma-cobre-oscuro);
+  color: var(--aroma-blanco);
+}
+
+/* BOTON CERRAR SESION */
+
+.navbar-aroma .btn-outline-secondary {
+  border-color: var(--aroma-cobre);
+  color: var(--aroma-cobre-oscuro);
+  border-radius: 8px;
+}
+
+.navbar-aroma .btn-outline-secondary:hover {
+  background-color: var(--aroma-cobre);
+  border-color: var(--aroma-cobre);
+  color: var(--aroma-blanco);
+}
+
+/* ==========================================
+   TARJETAS DE PRODUCTOS
+   ========================================== */
+
+.card-aroma {
+  background-color: var(--aroma-blanco);
+  border: 1px solid #f1ded5;
+  border-radius: 14px;
+  overflow: hidden;
+  transition: transform 0.3s ease,
+              box-shadow 0.3s ease;
+}
+
+.card-aroma:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 22px rgba(52, 35, 31, 0.12);
+}
+
+/* ==========================================
+   TITULOS
+   ========================================== */
+
+.titulo-aroma {
+  color: var(--aroma-oscuro);
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 25px;
+}
+
+.subtitulo-aroma {
+  color: var(--aroma-cobre-oscuro);
+  font-weight: 500;
+}
+
+/* ==========================================
+   FORMULARIOS
+   ========================================== */
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--aroma-cobre);
+  box-shadow: 0 0 0 0.2rem rgba(183, 123, 80, 0.2);
+}
+
+/* ==========================================
+   RESPONSIVE - TABLET
+   ========================================== */
+
+@media (max-width: 991px) {
+
+  .logo-aroma {
+    width: 125px;
+  }
+
+  .navbar-aroma .nav-link {
+    padding: 10px 0;
+    margin-right: 0;
+  }
+
+  .navbar-aroma .navbar-collapse {
+    padding-top: 12px;
+  }
+}
+
+/* ==========================================
+   RESPONSIVE - CELULARES
+   ========================================== */
+
+@media (max-width: 576px) {
+
+  .logo-aroma {
+    width: 110px;
+  }
+
+  .marca-aroma {
+    margin-right: 10px;
+  }
+
+  .titulo-aroma {
+    font-size: 24px;
+  }
+
+  .btn-aroma {
+    padding: 9px 15px;
+    font-size: 14px;
+  }
+}
