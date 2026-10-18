@@ -1,70 +1,76 @@
-# Getting Started with Create React App
+Pruebas unitarias y cobertura de código
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+El proyecto **AromaEsencial** incorpora pruebas unitarias para verificar el funcionamiento de diferentes componentes y servicios de la aplicación React.
 
-## Available Scripts
+Herramientas utilizadas
 
-In the project directory, you can run:
+- **Jasmine:** framework utilizado para definir y ejecutar los casos de prueba.
+- **Karma:** herramienta encargada de ejecutar las pruebas en el navegador.
+- **Chrome Headless:** navegador utilizado para ejecutar las pruebas automáticamente.
+- **React Testing Library:** biblioteca utilizada para probar componentes React.
 
-### `npm start`
+Ejecución de las pruebas
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+Para ejecutar las pruebas, abrir una terminal en la carpeta principal del proyecto y utilizar el siguiente comando:
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+```bash
+npm test
+```
 
-### `npm test`
+En Windows, si PowerShell bloquea la ejecución de npm, utilizar en cmd:
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+```bash
+npm test
+```
 
-### `npm run build`
+### Resultados obtenidos
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+Las pruebas fueron ejecutadas el 18 de octubre de 2026, obteniendo los siguientes resultados:
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+| Indicador | Resultado |
+|---|---|
+| Pruebas ejecutadas | 10 |
+| Pruebas aprobadas | 10 |
+| Pruebas fallidas | 0 |
+| Porcentaje de aprobación | 100 % |
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+**Resultado de la terminal:**
 
-### `npm run eject`
+```text
+Chrome Headless: Executed 10 of 10 SUCCESS
+TOTAL: 10 SUCCESS
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+Cobertura de código
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+El reporte generado por Karma presentó los siguientes porcentajes:
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+| Tipo de cobertura | Porcentaje |
+|---|---:|
+| Sentencias (Statements) | 71,33 % |
+| Ramas (Branches) | 66,66 % |
+| Funciones (Functions) | 66,03 % |
+| Líneas (Lines) | 71,91 % |
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+La cobertura de líneas alcanzó un **71,91 %** del código incluido en el reporte.
 
-## Learn More
+Áreas evaluadas
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+Las pruebas implementadas se encuentran organizadas en la carpeta `src/__tests__`:
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+- `componentesAtomsMolecules.test.js`: pruebas de componentes básicos y moléculas.
+- `componentesOrganisms.test.js`: pruebas de componentes organismos.
+- `cartServiceComplete.test.js`: pruebas de funcionalidades del carrito.
+- `serviciosCore.test.js`: pruebas de autenticación y gestión de productos.
 
-### Code Splitting
+Propuestas de mejora
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+Aunque las 10 pruebas se ejecutaron correctamente, todavía existen partes del código que no están cubiertas.
 
-### Analyzing the Bundle Size
+Como futuras mejoras se propone ampliar las pruebas de operaciones CRUD de productos, validaciones de formularios, gestión de órdenes y escenarios alternativos de los servicios.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+Conclusión
 
-### Making a Progressive Web App
+La implementación de pruebas unitarias permitió verificar las funcionalidades evaluadas de AromaEsencial y comprobar que los 10 casos ejecutados finalizaron correctamente.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+Los resultados obtenidos representan un avance en el aseguramiento de la calidad del software y permiten identificar oportunidades para mejorar la cobertura en futuras versiones del proyecto.
