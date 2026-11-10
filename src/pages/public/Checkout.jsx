@@ -21,7 +21,10 @@ import {
 
 import useAuth from '../../hooks/useAuth';
 
+// ==========================================
 // REGIONES Y COMUNAS
+// ==========================================
+
 const regionesComunas = {
   'Región Metropolitana de Santiago': [
     'Santiago',
@@ -53,11 +56,18 @@ const regionesComunas = {
   ]
 };
 
+// ==========================================
 // CUPONES
+// ==========================================
+
 const descuentos = {
   AROMA10: 0.10,
   BIENVENIDA15: 0.15
 };
+
+// ==========================================
+// COMPONENTE CHECKOUT
+// ==========================================
 
 function Checkout({
   carrito = [],
@@ -70,6 +80,10 @@ function Checkout({
 
   const cupon =
     location.state?.cupon || '';
+
+  // ========================================
+  // DATOS DEL FORMULARIO
+  // ========================================
 
   const [datos, setDatos] = useState({
     nombre: '',
@@ -88,7 +102,13 @@ function Checkout({
   const [error, setError] =
     useState('');
 
+  const [procesando, setProcesando] =
+    useState(false);
+
+  // ========================================
   // COMPLETAR DATOS DEL USUARIO
+  // ========================================
+
   useEffect(() => {
     if (!usuario) {
       return;
@@ -118,13 +138,20 @@ function Checkout({
       comuna:
         usuario.comuna || ''
     }));
+
   }, [usuario]);
 
+  // ========================================
   // COMUNAS SEGÚN REGIÓN
+  // ========================================
+
   const comunasDisponibles =
     regionesComunas[datos.region] || [];
 
+  // ========================================
   // SUBTOTAL
+  // ========================================
+
   const subtotal = carrito.reduce(
     (total, producto) =>
       total +
@@ -133,7 +160,10 @@ function Checkout({
     0
   );
 
+  // ========================================
   // DESCUENTO
+  // ========================================
+
   const porcentajeDescuento =
     descuentos[cupon] || 0;
 
@@ -142,19 +172,28 @@ function Checkout({
       porcentajeDescuento
   );
 
+  // ========================================
   // ENVÍO
+  // ========================================
+
   const costoEnvio =
     datos.envio === 'domicilio'
       ? 3990
       : 0;
 
+  // ========================================
   // TOTAL
+  // ========================================
+
   const total =
     subtotal -
     descuento +
     costoEnvio;
 
+  // ========================================
   // FORMATO DE PRECIO
+  // ========================================
+
   const formatoPrecio = (valor) =>
     new Intl.NumberFormat(
       'es-CL',
@@ -165,7 +204,10 @@ function Checkout({
       }
     ).format(valor);
 
+  // ========================================
   // CAMBIO DE FORMULARIO
+  // ========================================
+
   const handleChange = (e) => {
     const {
       name,
@@ -188,7 +230,10 @@ function Checkout({
     });
   };
 
+  // ========================================
   // NOMBRE DEL MÉTODO DE PAGO
+  // ========================================
+
   const obtenerNombreMetodoPago = () => {
     if (datos.metodoPago === 'debito') {
       return 'Tarjeta de débito';
@@ -198,21 +243,36 @@ function Checkout({
       return 'Tarjeta de crédito';
     }
 
-    if (datos.metodoPago === 'transferencia') {
+    if (
+      datos.metodoPago ===
+      'transferencia'
+    ) {
       return 'Transferencia bancaria';
     }
 
-    if (datos.metodoPago === 'simular-error') {
+    if (
+      datos.metodoPago ===
+      'simular-error'
+    ) {
       return 'Pago rechazado simulado';
     }
 
     return '';
   };
 
+  // ========================================
   // CONFIRMAR COMPRA
-  const confirmarCompra = (e) => {
+  // ========================================
+
+  const confirmarCompra = async (e) => {
     e.preventDefault();
 
+    // EVITAR DOBLE ENVÍO
+    if (procesando) {
+      return;
+    }
+
+    // VALIDAR CARRITO
     if (carrito.length === 0) {
       setError(
         'Tu carrito está vacío.'
@@ -221,6 +281,7 @@ function Checkout({
       return;
     }
 
+    // VALIDAR COMPRADOR
     if (
       !datos.nombre.trim() ||
       !datos.apellido.trim() ||
@@ -233,6 +294,7 @@ function Checkout({
       return;
     }
 
+    // VALIDAR DESPACHO
     if (
       datos.envio === 'domicilio'
     ) {
@@ -265,6 +327,10 @@ function Checkout({
     }
 
     setError('');
+
+    // ======================================
+    // ORDEN DEL FRONTEND
+    // ======================================
 
     const orden = {
       id:
@@ -302,7 +368,8 @@ function Checkout({
         datos.metodoPago === 'credito'
           ? {
               tipo:
-                datos.metodoPago === 'debito'
+                datos.metodoPago ===
+                'debito'
                   ? 'Débito'
                   : 'Crédito',
 
@@ -321,7 +388,10 @@ function Checkout({
         'Confirmada'
     };
 
-    // PAGO RECHAZADO
+    // ======================================
+    // PAGO RECHAZADO SIMULADO
+    // ======================================
+
     if (
       datos.metodoPago ===
       'simular-error'
@@ -342,7 +412,10 @@ function Checkout({
       return;
     }
 
-    // COMPRA EXITOSA
+    // ======================================
+    // COMPRA EXITOSA - API BACKEND
+    // ======================================
+
     try {
       if (
         typeof finalizarCompra !==
@@ -353,37 +426,53 @@ function Checkout({
         );
       }
 
+      setProcesando(true);
+
+      // ESPERAR RESPUESTA REAL
+      // DEL BACKEND
       const resultado =
-        finalizarCompra(
+        await finalizarCompra(
           orden
         );
 
-      if (
-        resultado === false
-      ) {
+      if (!resultado) {
         throw new Error(
           'No se pudo guardar la compra.'
         );
       }
 
+      // IR A COMPRA EXITOSA
+      // CON LA BOLETA REAL DEVUELTA
+      // POR SPRING BOOT
       navigate(
         '/compra-exitosa',
         {
           state: {
-            orden
+            orden: resultado
           }
         }
       );
 
     } catch (err) {
+      console.error(
+        'Error al confirmar la compra:',
+        err
+      );
+
       setError(
         err.message ||
         'No se pudo confirmar la compra.'
       );
+
+    } finally {
+      setProcesando(false);
     }
   };
 
+  // ========================================
   // CARRITO VACÍO
+  // ========================================
+
   if (
     carrito.length === 0
   ) {
@@ -402,6 +491,10 @@ function Checkout({
     );
   }
 
+  // ========================================
+  // VISTA
+  // ========================================
+
   return (
     <Container className="py-5">
 
@@ -411,7 +504,10 @@ function Checkout({
 
       <Row className="g-4">
 
-        {/* FORMULARIO */}
+        {/* =================================
+            FORMULARIO
+           ================================= */}
+
         <Col lg={8}>
 
           <Card className="shadow-sm">
@@ -424,15 +520,10 @@ function Checkout({
 
               {usuario && (
                 <Alert variant="success">
-
-                  Has iniciado sesión.
-
-                  {' '}
-
+                  Has iniciado sesión.{' '}
                   Tus datos disponibles
                   se completaron
                   automáticamente.
-
                 </Alert>
               )}
 
@@ -449,7 +540,10 @@ function Checkout({
                 }
               >
 
-                {/* NOMBRE Y APELLIDO */}
+                {/* =========================
+                    NOMBRE Y APELLIDO
+                   ========================= */}
+
                 <Row>
 
                   <Col md={6}>
@@ -467,6 +561,9 @@ function Checkout({
                         }
                         onChange={
                           handleChange
+                        }
+                        disabled={
+                          procesando
                         }
                         required
                       />
@@ -491,6 +588,9 @@ function Checkout({
                         onChange={
                           handleChange
                         }
+                        disabled={
+                          procesando
+                        }
                         required
                       />
 
@@ -500,7 +600,10 @@ function Checkout({
 
                 </Row>
 
-                {/* CORREO */}
+                {/* =========================
+                    CORREO
+                   ========================= */}
+
                 <Form.Group className="mb-3">
 
                   <Form.Label>
@@ -517,12 +620,18 @@ function Checkout({
                       handleChange
                     }
                     maxLength={100}
+                    disabled={
+                      procesando
+                    }
                     required
                   />
 
                 </Form.Group>
 
-                {/* TELÉFONO */}
+                {/* =========================
+                    TELÉFONO
+                   ========================= */}
+
                 <Form.Group className="mb-3">
 
                   <Form.Label>
@@ -540,11 +649,17 @@ function Checkout({
                     }
                     maxLength={15}
                     placeholder="+56912345678"
+                    disabled={
+                      procesando
+                    }
                   />
 
                 </Form.Group>
 
-                {/* ENTREGA */}
+                {/* =========================
+                    ENTREGA
+                   ========================= */}
+
                 <h5 className="mt-4 mb-3">
                   Tipo de entrega
                 </h5>
@@ -558,6 +673,9 @@ function Checkout({
                     handleChange
                   }
                   className="mb-3"
+                  disabled={
+                    procesando
+                  }
                 >
 
                   <option value="domicilio">
@@ -570,7 +688,10 @@ function Checkout({
 
                 </Form.Select>
 
-                {/* DIRECCIÓN */}
+                {/* =========================
+                    DIRECCIÓN
+                   ========================= */}
+
                 {datos.envio ===
                   'domicilio' && (
                   <>
@@ -594,6 +715,9 @@ function Checkout({
                           handleChange
                         }
                         placeholder="Ej: Los Aromos 123"
+                        disabled={
+                          procesando
+                        }
                         required
                       />
 
@@ -602,8 +726,7 @@ function Checkout({
                     <Form.Group className="mb-3">
 
                       <Form.Label>
-                        Departamento
-                        {' '}
+                        Departamento{' '}
                         (opcional)
                       </Form.Label>
 
@@ -616,6 +739,9 @@ function Checkout({
                           handleChange
                         }
                         placeholder="Ej: Depto 503"
+                        disabled={
+                          procesando
+                        }
                       />
 
                     </Form.Group>
@@ -634,6 +760,9 @@ function Checkout({
                         onChange={
                           handleChange
                         }
+                        disabled={
+                          procesando
+                        }
                         required
                       >
 
@@ -645,7 +774,6 @@ function Checkout({
                           regionesComunas
                         ).map(
                           (region) => (
-
                             <option
                               key={
                                 region
@@ -656,7 +784,6 @@ function Checkout({
                             >
                               {region}
                             </option>
-
                           )
                         )}
 
@@ -683,8 +810,9 @@ function Checkout({
                           handleChange
                         }
                         disabled={
+                          procesando ||
                           comunasDisponibles.length ===
-                          0
+                            0
                         }
                         required
                       >
@@ -700,7 +828,6 @@ function Checkout({
 
                         {comunasDisponibles.map(
                           (comuna) => (
-
                             <option
                               key={
                                 comuna
@@ -711,7 +838,6 @@ function Checkout({
                             >
                               {comuna}
                             </option>
-
                           )
                         )}
 
@@ -722,8 +848,7 @@ function Checkout({
                     <Form.Group className="mb-3">
 
                       <Form.Label>
-                        Indicaciones de entrega
-                        {' '}
+                        Indicaciones de entrega{' '}
                         (opcional)
                       </Form.Label>
 
@@ -738,6 +863,9 @@ function Checkout({
                           handleChange
                         }
                         placeholder="Ej: Entregar en conserjería"
+                        disabled={
+                          procesando
+                        }
                       />
 
                     </Form.Group>
@@ -745,7 +873,10 @@ function Checkout({
                   </>
                 )}
 
-                {/* MÉTODO DE PAGO */}
+                {/* =========================
+                    MÉTODO DE PAGO
+                   ========================= */}
+
                 <h5 className="mt-4 mb-3">
                   Método de pago
                 </h5>
@@ -759,6 +890,9 @@ function Checkout({
                     handleChange
                   }
                   className="mb-3"
+                  disabled={
+                    procesando
+                  }
                 >
 
                   <option value="debito">
@@ -779,18 +913,21 @@ function Checkout({
 
                 </Form.Select>
 
-                {/* DATOS DE TARJETA */}
+                {/* =========================
+                    DATOS DE TARJETA
+                   ========================= */}
+
                 {(datos.metodoPago ===
                   'debito' ||
                   datos.metodoPago ===
                   'credito') && (
+
                   <Card className="mb-3 bg-light">
 
                     <Card.Body>
 
                       <h6 className="mb-3">
-                        Datos de tarjeta
-                        {' '}
+                        Datos de tarjeta{' '}
                         - Simulación
                       </h6>
 
@@ -891,9 +1028,13 @@ function Checkout({
                   </Card>
                 )}
 
-                {/* TRANSFERENCIA */}
+                {/* =========================
+                    TRANSFERENCIA
+                   ========================= */}
+
                 {datos.metodoPago ===
                   'transferencia' && (
+
                   <Alert variant="secondary">
 
                     <strong>
@@ -906,13 +1047,11 @@ function Checkout({
 
                     <br />
 
-                    Cuenta:
-                    123456789
+                    Cuenta: 123456789
 
                     <br />
 
-                    Titular:
-                    AromaEsencial
+                    Titular: AromaEsencial
 
                     <br />
 
@@ -924,28 +1063,25 @@ function Checkout({
                   </Alert>
                 )}
 
-                {/* PAGO RECHAZADO */}
+                {/* =========================
+                    PAGO RECHAZADO
+                   ========================= */}
+
                 {datos.metodoPago ===
                   'simular-error' && (
-                  <Alert variant="danger">
 
+                  <Alert variant="danger">
                     Esta opción permite
                     demostrar el flujo de
                     una transacción rechazada.
-
                   </Alert>
                 )}
 
                 <Alert variant="info">
-
                   Esta compra es una
-                  simulación académica.
-
-                  {' '}
-
+                  simulación académica.{' '}
                   No se realizará ningún
                   cobro real.
-
                 </Alert>
 
               </Form>
@@ -956,7 +1092,10 @@ function Checkout({
 
         </Col>
 
-        {/* RESUMEN */}
+        {/* =================================
+            RESUMEN DEL PEDIDO
+           ================================= */}
+
         <Col lg={4}>
 
           <Card className="shadow-sm">
@@ -980,24 +1119,19 @@ function Checkout({
                   >
 
                     <span>
-
                       {producto.nombre}
                       {' × '}
                       {producto.cantidad}
-
                     </span>
 
                     <span>
-
                       {formatoPrecio(
                         producto.precio *
                         producto.cantidad
                       )}
-
                     </span>
 
                   </div>
-
                 )
               )}
 
@@ -1033,7 +1167,6 @@ function Checkout({
                   </strong>
 
                 </div>
-
               )}
 
               <div className="d-flex justify-content-between mb-2">
@@ -1078,13 +1211,22 @@ function Checkout({
 
               </div>
 
+              {/* =========================
+                  CONFIRMAR COMPRA
+                 ========================= */}
+
               <Button
                 type="submit"
                 form="form-checkout"
                 variant="success"
                 className="w-100 mt-3"
+                disabled={
+                  procesando
+                }
               >
-                Confirmar compra
+                {procesando
+                  ? 'Procesando compra...'
+                  : 'Confirmar compra'}
               </Button>
 
               <Button
@@ -1092,6 +1234,9 @@ function Checkout({
                 to="/carrito"
                 variant="outline-secondary"
                 className="w-100 mt-2"
+                disabled={
+                  procesando
+                }
               >
                 Volver al carrito
               </Button>

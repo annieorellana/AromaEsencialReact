@@ -8,15 +8,31 @@ import {
   EVENTO_ORDENES
 } from '../services/orderService';
 
-function useOrdenes() {
+function useOrdenes(usuarioId = null) {
   const [ordenes, setOrdenes] =
-    useState(obtenerOrdenes);
+    useState([]);
 
   useEffect(() => {
-    const actualizarOrdenes = () => {
-      setOrdenes(
-        obtenerOrdenes()
+    let activo = true;
+
+    const cargarOrdenes = async () => {
+      const datos = await obtenerOrdenes(
+        usuarioId
       );
+
+      if (activo) {
+        setOrdenes(
+          Array.isArray(datos)
+            ? datos
+            : []
+        );
+      }
+    };
+
+    cargarOrdenes();
+
+    const actualizarOrdenes = () => {
+      cargarOrdenes();
     };
 
     window.addEventListener(
@@ -24,23 +40,15 @@ function useOrdenes() {
       actualizarOrdenes
     );
 
-    window.addEventListener(
-      'storage',
-      actualizarOrdenes
-    );
-
     return () => {
+      activo = false;
+
       window.removeEventListener(
         EVENTO_ORDENES,
         actualizarOrdenes
       );
-
-      window.removeEventListener(
-        'storage',
-        actualizarOrdenes
-      );
     };
-  }, []);
+  }, [usuarioId]);
 
   return ordenes;
 }

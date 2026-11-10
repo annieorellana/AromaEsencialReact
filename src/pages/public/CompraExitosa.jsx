@@ -1,121 +1,427 @@
 import React from 'react';
-import { Container, Card, Alert, Button, Table } from 'react-bootstrap';
-import { Link, useLocation } from 'react-router-dom';
+
+import {
+  Container,
+  Card,
+  Alert,
+  Button,
+  Table,
+  Badge
+} from 'react-bootstrap';
+
+import {
+  Link,
+  useLocation
+} from 'react-router-dom';
 
 function CompraExitosa() {
   const location = useLocation();
 
-  const orden = location.state?.orden;
+  const orden =
+    location.state?.orden;
+
+  // ========================================
+  // FORMATO DE PRECIO
+  // ========================================
 
   const formatoPrecio = (valor) =>
-    new Intl.NumberFormat('es-CL', {
-      style: 'currency',
-      currency: 'CLP',
-      maximumFractionDigits: 0
-    }).format(valor || 0);
+    new Intl.NumberFormat(
+      'es-CL',
+      {
+        style: 'currency',
+        currency: 'CLP',
+        maximumFractionDigits: 0
+      }
+    ).format(valor || 0);
+
+  // ========================================
+  // FORMATO DE FECHA
+  // ========================================
+
+  const formatoFecha = (fecha) => {
+    if (!fecha) {
+      return 'Sin información';
+    }
+
+    const fechaConvertida =
+      new Date(fecha);
+
+    if (
+      Number.isNaN(
+        fechaConvertida.getTime()
+      )
+    ) {
+      return fecha;
+    }
+
+    return fechaConvertida.toLocaleString(
+      'es-CL'
+    );
+  };
+
+  // ========================================
+  // SIN INFORMACIÓN DE COMPRA
+  // ========================================
 
   if (!orden) {
     return (
       <Container className="py-5">
+
         <Alert variant="info">
-          No hay información de una compra reciente.
+          No hay información de una
+          compra reciente.
         </Alert>
 
-        <Button as={Link} to="/productos" variant="primary">
+        <Button
+          as={Link}
+          to="/productos"
+          variant="primary"
+        >
           Ver productos
         </Button>
+
       </Container>
     );
   }
 
+  const detalles =
+    Array.isArray(orden.detalles)
+      ? orden.detalles
+      : [];
+
+  const esDomicilio =
+    String(
+      orden.metodoEnvio || ''
+    ).toLowerCase() ===
+    'domicilio';
+
+  // ========================================
+  // VISTA
+  // ========================================
+
   return (
     <Container className="py-5">
 
-      <Card className="shadow-sm mx-auto" style={{ maxWidth: '850px' }}>
+      <Card
+        className="shadow-sm mx-auto"
+        style={{
+          maxWidth: '850px'
+        }}
+      >
+
         <Card.Body className="p-4">
 
-          <Alert variant="success" className="text-center">
-            <h3>¡Compra realizada exitosamente!</h3>
-            Tu pedido ha sido registrado correctamente.
+          {/* ===============================
+              MENSAJE DE ÉXITO
+             =============================== */}
+
+          <Alert
+            variant="success"
+            className="text-center"
+          >
+
+            <h3>
+              ¡Compra realizada exitosamente!
+            </h3>
+
+            Tu pedido ha sido registrado
+            correctamente.
+
           </Alert>
 
-          <h4>Información del pedido</h4>
+          {/* ===============================
+              INFORMACIÓN DE LA BOLETA
+             =============================== */}
 
-          <p><strong>Número:</strong> {orden.id}</p>
+          <h4>
+            Información del pedido
+          </h4>
 
           <p>
-            <strong>Fecha:</strong>{' '}
-            {new Date(orden.fecha).toLocaleString('es-CL')}
+            <strong>
+              Número de boleta:
+            </strong>{' '}
+
+            #{orden.id}
           </p>
 
           <p>
-            <strong>Cliente:</strong>{' '}
-            {orden.cliente.nombre} {orden.cliente.apellido}
+            <strong>
+              Fecha:
+            </strong>{' '}
+
+            {formatoFecha(
+              orden.fecha
+            )}
           </p>
 
           <p>
-            <strong>Correo:</strong> {orden.cliente.correo}
+            <strong>
+              Estado:
+            </strong>{' '}
+
+            <Badge bg="success">
+              {orden.estado ||
+                'CONFIRMADA'}
+            </Badge>
           </p>
 
           <p>
-            <strong>Entrega:</strong>{' '}
-            {orden.cliente.envio === 'domicilio'
+            <strong>
+              Cliente:
+            </strong>{' '}
+
+            {orden.nombreCliente ||
+              'Cliente'}
+          </p>
+
+          <p>
+            <strong>
+              Correo:
+            </strong>{' '}
+
+            {orden.correoCliente ||
+              'Sin información'}
+          </p>
+
+          {orden.telefono && (
+            <p>
+              <strong>
+                Teléfono:
+              </strong>{' '}
+
+              {orden.telefono}
+            </p>
+          )}
+
+          <p>
+            <strong>
+              Entrega:
+            </strong>{' '}
+
+            {esDomicilio
               ? 'Despacho a domicilio'
               : 'Retiro en tienda'}
           </p>
 
-          {orden.cliente.envio === 'domicilio' && (
+          {esDomicilio && (
+            <>
+
+              <p>
+                <strong>
+                  Dirección:
+                </strong>{' '}
+
+                {orden.direccionEnvio ||
+                  'Sin información'}
+              </p>
+
+              <p>
+                <strong>
+                  Comuna:
+                </strong>{' '}
+
+                {orden.comuna ||
+                  'Sin información'}
+              </p>
+
+              <p>
+                <strong>
+                  Región:
+                </strong>{' '}
+
+                {orden.region ||
+                  'Sin información'}
+              </p>
+
+            </>
+          )}
+
+          <p>
+            <strong>
+              Método de pago:
+            </strong>{' '}
+
+            {orden.metodoPago ||
+              'Sin información'}
+          </p>
+
+          {orden.cupon && (
             <p>
-              <strong>Dirección:</strong>{' '}
-              {orden.cliente.direccion},{' '}
-              {orden.cliente.comuna},{' '}
-              {orden.cliente.region}
+              <strong>
+                Cupón aplicado:
+              </strong>{' '}
+
+              {orden.cupon}
             </p>
           )}
 
           <hr />
 
-          <h4>Productos comprados</h4>
+          {/* ===============================
+              PRODUCTOS
+             =============================== */}
 
-          <Table responsive striped>
-            <thead>
-              <tr>
-                <th>Producto</th>
-                <th>Cantidad</th>
-                <th>Subtotal</th>
-              </tr>
-            </thead>
+          <h4>
+            Productos comprados
+          </h4>
 
-            <tbody>
-              {orden.productos.map((producto) => (
-                <tr key={producto.id}>
-                  <td>{producto.nombre}</td>
-                  <td>{producto.cantidad}</td>
-                  <td>
-                    {formatoPrecio(
-                      producto.precio * producto.cantidad
-                    )}
-                  </td>
+          {detalles.length > 0 ? (
+
+            <Table
+              responsive
+              striped
+              bordered
+            >
+
+              <thead>
+
+                <tr>
+                  <th>
+                    Producto
+                  </th>
+
+                  <th>
+                    Cantidad
+                  </th>
+
+                  <th>
+                    Precio unitario
+                  </th>
+
+                  <th>
+                    Subtotal
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </Table>
+
+              </thead>
+
+              <tbody>
+
+                {detalles.map(
+                  (detalle) => (
+
+                    <tr
+                      key={
+                        detalle.id ||
+                        `${detalle.productoId}-${detalle.nombreProducto}`
+                      }
+                    >
+
+                      <td>
+                        {detalle.nombreProducto}
+                      </td>
+
+                      <td>
+                        {detalle.cantidad}
+                      </td>
+
+                      <td>
+                        {formatoPrecio(
+                          detalle.precioUnitario
+                        )}
+                      </td>
+
+                      <td>
+                        {formatoPrecio(
+                          detalle.subtotal
+                        )}
+                      </td>
+
+                    </tr>
+
+                  )
+                )}
+
+              </tbody>
+
+            </Table>
+
+          ) : (
+
+            <Alert variant="warning">
+              No fue posible mostrar el
+              detalle de los productos.
+            </Alert>
+
+          )}
 
           <hr />
 
-          <p>Subtotal: {formatoPrecio(orden.subtotal)}</p>
+          {/* ===============================
+              TOTALES
+             =============================== */}
 
-          <p>Descuento: -{formatoPrecio(orden.descuento)}</p>
+          <div className="d-flex justify-content-between mb-2">
 
-          <p>Despacho: {formatoPrecio(orden.costoEnvio)}</p>
+            <span>
+              Subtotal:
+            </span>
 
-          <h4 className="text-success">
-            Total: {formatoPrecio(orden.total)}
-          </h4>
+            <strong>
+              {formatoPrecio(
+                orden.subtotal
+              )}
+            </strong>
 
-          <Alert variant="info" className="mt-4">
-            Esta compra es una simulación académica.
-            No se realizó ningún cobro real.
+          </div>
+
+          <div className="d-flex justify-content-between mb-2">
+
+            <span>
+              Descuento:
+            </span>
+
+            <strong className="text-success">
+              -
+              {formatoPrecio(
+                orden.descuento
+              )}
+            </strong>
+
+          </div>
+
+          <div className="d-flex justify-content-between mb-2">
+
+            <span>
+              Despacho:
+            </span>
+
+            <strong>
+              {formatoPrecio(
+                orden.costoEnvio
+              )}
+            </strong>
+
+          </div>
+
+          <hr />
+
+          <div className="d-flex justify-content-between">
+
+            <h4>
+              Total:
+            </h4>
+
+            <h4 className="text-success">
+              {formatoPrecio(
+                orden.total
+              )}
+            </h4>
+
+          </div>
+
+          {/* ===============================
+              AVISO ACADÉMICO
+             =============================== */}
+
+          <Alert
+            variant="info"
+            className="mt-4"
+          >
+            Esta compra es una simulación
+            académica. No se realizó ningún
+            cobro real.
           </Alert>
 
           <Button
@@ -128,6 +434,7 @@ function CompraExitosa() {
           </Button>
 
         </Card.Body>
+
       </Card>
 
     </Container>

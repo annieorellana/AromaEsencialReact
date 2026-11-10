@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, {
+  useState
+} from 'react';
 
 import {
   Container,
@@ -22,23 +24,43 @@ import {
 
 function Login() {
 
-  const navigate = useNavigate();
+  const navigate =
+    useNavigate();
 
-  const [correo, setCorreo] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [
+    correo,
+    setCorreo
+  ] = useState('');
 
-  const enviarFormulario = (e) => {
+  const [
+    password,
+    setPassword
+  ] = useState('');
+
+  const [
+    error,
+    setError
+  ] = useState('');
+
+  const enviarFormulario = (
+    e
+  ) => {
 
     e.preventDefault();
 
     setError('');
 
     const correoLimpio =
-      correo.trim().toLowerCase();
+      correo
+        .trim()
+        .toLowerCase();
 
+    // ======================================
     // VALIDAR CORREO
+    // ======================================
+
     if (!correoLimpio) {
+
       setError(
         'El correo electrónico es obligatorio.'
       );
@@ -46,7 +68,10 @@ function Login() {
       return;
     }
 
-    if (correoLimpio.length > 100) {
+    if (
+      correoLimpio.length > 100
+    ) {
+
       setError(
         'El correo no puede superar los 100 caracteres.'
       );
@@ -54,7 +79,12 @@ function Login() {
       return;
     }
 
-    if (!validarDominioCorreo(correoLimpio)) {
+    if (
+      !validarDominioCorreo(
+        correoLimpio
+      )
+    ) {
+
       setError(
         'Debe utilizar un correo @duoc.cl, @profesor.duoc.cl o @gmail.com.'
       );
@@ -62,8 +92,12 @@ function Login() {
       return;
     }
 
+    // ======================================
     // VALIDAR CONTRASEÑA
+    // ======================================
+
     if (!password) {
+
       setError(
         'La contraseña es obligatoria.'
       );
@@ -75,6 +109,7 @@ function Login() {
       password.length < 4 ||
       password.length > 10
     ) {
+
       setError(
         'La contraseña debe tener entre 4 y 10 caracteres.'
       );
@@ -82,11 +117,15 @@ function Login() {
       return;
     }
 
-    // INICIAR SESIÓN MEDIANTE EL SERVICIO
-    const resultado = iniciarSesion(
-      correoLimpio,
-      password
-    );
+    // ======================================
+    // INICIAR SESIÓN
+    // ======================================
+
+    const resultado =
+      iniciarSesion(
+        correoLimpio,
+        password
+      );
 
     if (!resultado.exito) {
 
@@ -97,19 +136,44 @@ function Login() {
       return;
     }
 
+    // ======================================
     // REDIRECCIÓN SEGÚN ROL
+    // ======================================
+
     const rol =
       resultado.usuario.rol;
 
+    // ADMINISTRADOR
+
     if (rol === 'admin') {
-      navigate('/admin');
+
+      navigate(
+        '/admin'
+      );
+
       return;
     }
+
+    // VENDEDOR
+
+    if (
+      rol === 'vendedor'
+    ) {
+
+      navigate(
+        '/vendedor/productos'
+      );
+
+      return;
+    }
+
+    // CLIENTE
 
     navigate('/');
   };
 
   return (
+
     <Container className="py-5">
 
       <Row className="justify-content-center">
@@ -145,9 +209,14 @@ function Login() {
 
               )}
 
-              <Form onSubmit={enviarFormulario}>
+              <Form
+                onSubmit={
+                  enviarFormulario
+                }
+              >
 
                 {/* CORREO */}
+
                 <Form.Group className="mb-3">
 
                   <Form.Label>
@@ -157,8 +226,11 @@ function Login() {
                   <Form.Control
                     type="email"
                     value={correo}
-                    onChange={(e) =>
-                      setCorreo(e.target.value)
+                    onChange={
+                      (e) =>
+                        setCorreo(
+                          e.target.value
+                        )
                     }
                     maxLength={100}
                     placeholder="ejemplo@gmail.com"
@@ -168,6 +240,7 @@ function Login() {
                 </Form.Group>
 
                 {/* CONTRASEÑA */}
+
                 <Form.Group className="mb-4">
 
                   <Form.Label>
@@ -177,8 +250,11 @@ function Login() {
                   <Form.Control
                     type="password"
                     value={password}
-                    onChange={(e) =>
-                      setPassword(e.target.value)
+                    onChange={
+                      (e) =>
+                        setPassword(
+                          e.target.value
+                        )
                     }
                     minLength={4}
                     maxLength={10}
@@ -192,6 +268,7 @@ function Login() {
                 </Form.Group>
 
                 {/* BOTÓN */}
+
                 <Button
                   type="submit"
                   variant="dark"
@@ -223,6 +300,7 @@ function Login() {
       </Row>
 
     </Container>
+
   );
 }
 

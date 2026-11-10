@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 // ESTILOS CORPORATIVOS AROMAESENCIAL
@@ -39,13 +38,24 @@ import Registro from './pages/public/Registro';
 // MODULO ADMINISTRADOR
 // ==========================================
 
-import { adminRoutes } from './routes/AdminRoutes';
+import {
+  adminRoutes
+} from './routes/AdminRoutes';
+
+// ==========================================
+// MODULO VENDEDOR
+// ==========================================
+
+import {
+  sellerRoutes
+} from './routes/SellerRoutes';
 
 // ==========================================
 // TEMPLATE PRINCIPAL
 // ==========================================
 
-import MainLayout from './components/templates/MainLayout';
+import MainLayout
+  from './components/templates/MainLayout';
 
 // ==========================================
 // SERVICIO DE ORDENES
@@ -59,7 +69,8 @@ import {
 // HOOK DEL CARRITO
 // ==========================================
 
-import useCart from './hooks/useCart';
+import useCart
+  from './hooks/useCart';
 
 // ==========================================
 // COMPONENTE PRINCIPAL APP
@@ -81,25 +92,44 @@ function App() {
   // FINALIZAR COMPRA
   // ========================================
 
-  const finalizarCompra = (orden) => {
+  const finalizarCompra =
+    async (orden) => {
 
-    const nuevaOrden = crearOrden(orden);
+      try {
 
-    // SI NO SE CREA LA ORDEN
-    if (!nuevaOrden) {
-      return false;
-    }
+        const nuevaOrden =
+          await crearOrden(
+            orden
+          );
 
-    // LIMPIAR CARRITO DESPUES DE COMPRAR
-    limpiarCarrito();
+        // SI EL BACKEND NO CREA LA ORDEN
+        if (!nuevaOrden) {
+          return null;
+        }
 
-    return true;
-  };
+        // LIMPIAR CARRITO SOLO DESPUÉS
+        // DE CREAR CORRECTAMENTE LA BOLETA
+        limpiarCarrito();
+
+        return nuevaOrden;
+
+      } catch (error) {
+
+        console.error(
+          'Error al finalizar la compra:',
+          error
+        );
+
+        return null;
+      }
+    };
 
   return (
 
     <MainLayout
-      cantidadCarrito={cantidadCarrito}
+      cantidadCarrito={
+        cantidadCarrito
+      }
     >
 
       <Routes>
@@ -110,7 +140,9 @@ function App() {
 
         <Route
           path="/"
-          element={<Home />}
+          element={
+            <Home />
+          }
         />
 
         {/* =================================
@@ -121,7 +153,9 @@ function App() {
           path="/productos"
           element={
             <Productos
-              onAgregar={agregarAlCarrito}
+              onAgregar={
+                agregarAlCarrito
+              }
             />
           }
         />
@@ -130,7 +164,9 @@ function App() {
           path="/productos/:id"
           element={
             <ProductoDetalle
-              onAgregar={agregarAlCarrito}
+              onAgregar={
+                agregarAlCarrito
+              }
             />
           }
         />
@@ -141,14 +177,18 @@ function App() {
 
         <Route
           path="/categorias"
-          element={<Categorias />}
+          element={
+            <Categorias />
+          }
         />
 
         <Route
           path="/categorias/:categoria"
           element={
             <CategoriaDetalle
-              onAgregar={agregarAlCarrito}
+              onAgregar={
+                agregarAlCarrito
+              }
             />
           }
         />
@@ -161,7 +201,9 @@ function App() {
           path="/ofertas"
           element={
             <Ofertas
-              onAgregar={agregarAlCarrito}
+              onAgregar={
+                agregarAlCarrito
+              }
             />
           }
         />
@@ -172,7 +214,9 @@ function App() {
 
         <Route
           path="/nosotros"
-          element={<Nosotros />}
+          element={
+            <Nosotros />
+          }
         />
 
         {/* =================================
@@ -181,12 +225,16 @@ function App() {
 
         <Route
           path="/blogs"
-          element={<Blogs />}
+          element={
+            <Blogs />
+          }
         />
 
         <Route
           path="/blogs/:id"
-          element={<BlogDetalle />}
+          element={
+            <BlogDetalle />
+          }
         />
 
         {/* =================================
@@ -195,7 +243,9 @@ function App() {
 
         <Route
           path="/contacto"
-          element={<Contacto />}
+          element={
+            <Contacto />
+          }
         />
 
         {/* =================================
@@ -206,9 +256,15 @@ function App() {
           path="/carrito"
           element={
             <Carrito
-              carrito={carrito}
-              cambiarCantidad={cambiarCantidad}
-              eliminarProducto={eliminarProducto}
+              carrito={
+                carrito
+              }
+              cambiarCantidad={
+                cambiarCantidad
+              }
+              eliminarProducto={
+                eliminarProducto
+              }
             />
           }
         />
@@ -221,8 +277,12 @@ function App() {
           path="/checkout"
           element={
             <Checkout
-              carrito={carrito}
-              finalizarCompra={finalizarCompra}
+              carrito={
+                carrito
+              }
+              finalizarCompra={
+                finalizarCompra
+              }
             />
           }
         />
@@ -233,12 +293,16 @@ function App() {
 
         <Route
           path="/compra-exitosa"
-          element={<CompraExitosa />}
+          element={
+            <CompraExitosa />
+          }
         />
 
         <Route
           path="/compra-error"
-          element={<CompraError />}
+          element={
+            <CompraError />
+          }
         />
 
         {/* =================================
@@ -247,7 +311,9 @@ function App() {
 
         <Route
           path="/login"
-          element={<Login />}
+          element={
+            <Login />
+          }
         />
 
         {/* =================================
@@ -256,7 +322,9 @@ function App() {
 
         <Route
           path="/registro"
-          element={<Registro />}
+          element={
+            <Registro />
+          }
         />
 
         {/* =================================
@@ -266,13 +334,21 @@ function App() {
         {adminRoutes}
 
         {/* =================================
+            MODULO VENDEDOR
+           ================================= */}
+
+        {sellerRoutes}
+
+        {/* =================================
             PAGINA NO ENCONTRADA
            ================================= */}
 
         <Route
           path="*"
           element={
-            <Container className="text-center py-5">
+            <Container
+              className="text-center py-5"
+            >
 
               <h2>
                 Página no encontrada
