@@ -1,109 +1,65 @@
-import productosIniciales from '../data/productos';
 
-const CLAVE_PRODUCTOS = 'aromaesencial_productos';
+import {
+  listarProductos,
+  buscarProducto,
+  crearProductoApi,
+  actualizarProductoApi,
+  eliminarProductoApi,
+  listarStockCritico,
+  listarOfertas
+} from './CatalogoApi';
 
-export const EVENTO_PRODUCTOS = 'aromaesencial-productos-actualizados';
+export const EVENTO_PRODUCTOS =
+  'aromaesencial-productos-actualizados';
 
-// Obtener los productos guardados
-export function obtenerProductos() {
-  try {
-    const guardados = localStorage.getItem(CLAVE_PRODUCTOS);
-
-    if (guardados !== null) {
-      const productos = JSON.parse(guardados);
-
-      if (Array.isArray(productos)) {
-        return productos;
-      }
-    }
-  } catch (error) {
-    console.error('Error al leer productos:', error);
-  }
-
-  return [...productosIniciales];
-}
-
-// Guardar productos
-function guardarProductos(productos) {
-  localStorage.setItem(
-    CLAVE_PRODUCTOS,
-    JSON.stringify(productos)
-  );
-
+// Avisar a React que debe actualizar el catálogo
+function notificarCambios() {
   window.dispatchEvent(new Event(EVENTO_PRODUCTOS));
-
-  return productos;
 }
 
-// CREATE: Agregar un producto
-export function crearProducto(producto) {
-  const productos = obtenerProductos();
+// READ: Obtener productos desde Spring Boot
+export async function obtenerProductos() {
+  return await listarProductos();
+}
 
-  const nuevoProducto = {
-    ...producto,
-    id: producto.id || `PROD-${Date.now()}`
-  };
+// READ: Obtener producto por ID
+export async function obtenerProductoPorId(id) {
+  return await buscarProducto(id);
+}
 
-  if (productos.some((item) => item.id === nuevoProducto.id)) {
-    throw new Error('Ya existe un producto con ese ID.');
-  }
+// CREATE: Crear producto en la base de datos
+export async function crearProducto(producto) {
+  const nuevoProducto = await crearProductoApi(producto);
 
-  guardarProductos([...productos, nuevoProducto]);
+  notificarCambios();
 
   return nuevoProducto;
 }
 
-// READ: Buscar un producto por ID
-export function obtenerProductoPorId(id) {
-  return obtenerProductos().find(
-    (producto) => producto.id === id
-  );
+// UPDATE: Actualizar producto en la base de datos
+export async function actualizarProducto(id, cambios) {
+  const actualizado = await actualizarProductoApi(id, cambios);
+
+  notificarCambios();
+
+  return actualizado;
 }
 
-// UPDATE: Actualizar un producto
-export function actualizarProducto(id, cambios) {
-  const productos = obtenerProductos();
+// DELETE: Eliminar producto de la base de datos
+export async function eliminarProducto(id) {
+  await eliminarProductoApi(id);
 
-  if (!productos.some((producto) => producto.id === id)) {
-    throw new Error('El producto no existe.');
-  }
-
-  const actualizados = productos.map((producto) =>
-    producto.id === id
-      ? { ...producto, ...cambios, id }
-      : producto
-  );
-
-  guardarProductos(actualizados);
-
-  return actualizados.find((producto) => producto.id === id);
-}
-
-// DELETE: Eliminar un producto
-export function eliminarProducto(id) {
-  const productos = obtenerProductos();
-
-  if (!productos.some((producto) => producto.id === id)) {
-    return false;
-  }
-
-  guardarProductos(
-    productos.filter((producto) => producto.id !== id)
-  );
+  notificarCambios();
 
   return true;
 }
 
-// Consultar productos con stock crítico
-export function obtenerProductosStockCritico() {
-  return obtenerProductos().filter(
-    (producto) => producto.stock <= producto.stockCritico
-  );
+// Consultar stock crítico desde Spring Boot
+export async function obtenerProductosStockCritico() {
+  return await listarStockCritico();
 }
 
-// Consultar ofertas
-export function obtenerProductosEnOferta() {
-  return obtenerProductos().filter(
-    (producto) => producto.oferta === true
-  );
+// Consultar productos en oferta desde Spring Boot
+export async function obtenerProductosEnOferta() {
+  return await listarOfertas();
 }

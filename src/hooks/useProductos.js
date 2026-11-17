@@ -1,37 +1,44 @@
+
 import { useEffect, useState } from 'react';
 
-import {
-  obtenerProductos,
-  EVENTO_PRODUCTOS
-} from '../services/productoService';
+import { listarProductos } from '../services/CatalogoApi';
+
+import { EVENTO_PRODUCTOS } from '../services/productoService';
 
 function useProductos() {
-  const [productos, setProductos] = useState(obtenerProductos);
+  const [productos, setProductos] = useState([]);
 
   useEffect(() => {
-    const actualizarProductos = () => {
-      setProductos(obtenerProductos());
+    let activo = true;
+
+    const cargarProductos = async () => {
+      try {
+        const datos = await listarProductos();
+
+        if (activo) {
+          setProductos(Array.isArray(datos) ? datos : []);
+        }
+      } catch (error) {
+        console.error(
+          'Error al cargar productos desde Spring Boot:',
+          error
+        );
+      }
     };
+
+    cargarProductos();
 
     window.addEventListener(
       EVENTO_PRODUCTOS,
-      actualizarProductos
-    );
-
-    window.addEventListener(
-      'storage',
-      actualizarProductos
+      cargarProductos
     );
 
     return () => {
-      window.removeEventListener(
-        EVENTO_PRODUCTOS,
-        actualizarProductos
-      );
+      activo = false;
 
       window.removeEventListener(
-        'storage',
-        actualizarProductos
+        EVENTO_PRODUCTOS,
+        cargarProductos
       );
     };
   }, []);
