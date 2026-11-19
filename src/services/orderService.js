@@ -1,3 +1,4 @@
+import { obtenerToken } from './authService';
 // ==========================================
 // AROMAESENCIAL
 // SERVICIO DE BOLETAS / ÓRDENES
@@ -27,7 +28,25 @@ const API_PRODUCTOS =
 // Cliente Demo = ID 3
 //
 // ==========================================
+function obtenerHeadersAutenticados(
+  incluirContentType = false
+) {
+  const token = obtenerToken();
 
+  if (!token) {
+    throw new Error(
+      'No hay una sesión válida. Debes iniciar sesión.'
+    );
+  }
+
+  return {
+    Accept: 'application/json',
+    Authorization: `Bearer ${token}`,
+    ...(incluirContentType
+      ? { 'Content-Type': 'application/json' }
+      : {})
+  };
+}
 const USUARIO_CLIENTE_DEMO_ID = 3;
 
 // EVENTO PARA ACTUALIZAR LAS VISTAS
@@ -327,10 +346,7 @@ export async function obtenerOrdenes() {
       {
         method: 'GET',
 
-        headers: {
-          Accept:
-            'application/json'
-        }
+        headers: obtenerHeadersAutenticados()
       }
     );
 
