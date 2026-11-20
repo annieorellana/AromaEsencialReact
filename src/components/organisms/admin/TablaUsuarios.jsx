@@ -5,17 +5,34 @@ import { Button } from 'react-bootstrap';
 import TablaResponsiva from '../../molecules/admin/TablaResponsiva';
 import Badge from '../../atoms/Badge';
 
+// Colores según el rol del usuario
 const COLOR_ROL = {
   admin: 'dark',
   vendedor: 'primary',
   cliente: 'secondary'
 };
 
+// Roles utilizados en los filtros
 export const ROLES = [
   'admin',
   'vendedor',
   'cliente'
 ];
+
+// Convierte los roles del backend al formato del frontend
+function obtenerRol(rol) {
+  const valor = String(rol || 'CLIENTE').toUpperCase();
+
+  if (valor === 'ADMINISTRADOR' || valor === 'ADMIN') {
+    return 'admin';
+  }
+
+  if (valor === 'VENDEDOR') {
+    return 'vendedor';
+  }
+
+  return 'cliente';
+}
 
 function TablaUsuarios({
   usuarios = [],
@@ -39,30 +56,33 @@ function TablaUsuarios({
 
       {usuarios.map((usuario) => {
 
-        const rol = String(
-          usuario.rol || 'cliente'
-        ).toLowerCase();
+        const rol = obtenerRol(usuario.rol);
 
         return (
-          <tr key={usuario.id || usuario.correo}>
+          <tr key={usuario.id ?? usuario.correo}>
 
             <td>
               {usuario.run || '—'}
             </td>
 
             <td>
-              {usuario.nombre} {usuario.apellido}
+              {usuario.nombre || ''}{' '}
+              {usuario.apellido || ''}
             </td>
 
             <td>
-              {usuario.correo}
+              {usuario.correo || '—'}
             </td>
 
             <td>
               <Badge
                 bg={COLOR_ROL[rol] || 'secondary'}
               >
-                {usuario.tipoUsuario || rol}
+                {rol === 'admin'
+                  ? 'Administrador'
+                  : rol === 'vendedor'
+                    ? 'Vendedor'
+                    : 'Cliente'}
               </Badge>
             </td>
 
