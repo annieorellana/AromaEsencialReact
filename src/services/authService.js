@@ -1,18 +1,13 @@
-const CLAVE_USUARIOS =
-  'aromaesencial_usuarios';
 
-const CLAVE_USUARIOS_ANTIGUA =
-  'aromaesencial-users';
+const API_URL = 'http://localhost:8080/api/v1';
 
-const CLAVE_SESION =
-  'aromaesencial_sesion';
+const CLAVE_USUARIOS = 'aromaesencial_usuarios';
+const CLAVE_USUARIOS_ANTIGUA = 'aromaesencial-users';
+const CLAVE_SESION = 'aromaesencial_sesion';
+const CLAVE_TOKEN = 'aromaesencial_token';
 
 export const EVENTO_SESION =
   'aromaesencial-sesion-actualizada';
-
-// ==========================================
-// DOMINIOS PERMITIDOS DEL PROYECTO
-// ==========================================
 
 export const DOMINIOS_PERMITIDOS = [
   '@duoc.cl',
@@ -21,140 +16,80 @@ export const DOMINIOS_PERMITIDOS = [
 ];
 
 // ==========================================
-// OBTENER TODOS LOS USUARIOS
+// OBTENER USUARIOS LOCALES
 // ==========================================
 
 export function obtenerUsuarios() {
   try {
-    const actuales =
-      JSON.parse(
-        localStorage.getItem(
-          CLAVE_USUARIOS
-        ) || '[]'
-      );
+    const actuales = JSON.parse(
+      localStorage.getItem(CLAVE_USUARIOS) || '[]'
+    );
 
-    const antiguos =
-      JSON.parse(
-        localStorage.getItem(
-          CLAVE_USUARIOS_ANTIGUA
-        ) || '[]'
-      );
-
-    const listaActual =
-      Array.isArray(actuales)
-        ? actuales
-        : [];
-
-    const listaAntigua =
-      Array.isArray(antiguos)
-        ? antiguos
-        : [];
+    const antiguos = JSON.parse(
+      localStorage.getItem(CLAVE_USUARIOS_ANTIGUA) || '[]'
+    );
 
     const combinados = [
-      ...listaActual,
-      ...listaAntigua
+      ...(Array.isArray(actuales) ? actuales : []),
+      ...(Array.isArray(antiguos) ? antiguos : [])
     ];
 
-    // EVITAR USUARIOS DUPLICADOS
-    // UTILIZANDO EL CORREO
-
     return combinados.filter(
-      (
-        usuario,
-        index,
-        arreglo
-      ) =>
-        index ===
-        arreglo.findIndex(
-          (item) =>
-            item.correo
-              ?.toLowerCase() ===
-            usuario.correo
-              ?.toLowerCase()
+      (usuario, index, arreglo) =>
+        index === arreglo.findIndex(
+          item =>
+            item.correo?.toLowerCase() ===
+            usuario.correo?.toLowerCase()
         )
     );
 
   } catch (error) {
-
-    console.error(
-      'Error al leer usuarios:',
-      error
-    );
-
+    console.error('Error al leer usuarios:', error);
     return [];
   }
 }
 
 // ==========================================
-// GUARDAR USUARIOS
+// GUARDAR USUARIOS LOCALES
 // ==========================================
 
-export function guardarUsuarios(
-  usuarios
-) {
+export function guardarUsuarios(usuarios) {
   try {
-
     localStorage.setItem(
       CLAVE_USUARIOS,
-      JSON.stringify(
-        usuarios
-      )
+      JSON.stringify(usuarios)
     );
 
     return true;
 
   } catch (error) {
-
-    console.error(
-      'Error al guardar usuarios:',
-      error
-    );
-
+    console.error('Error al guardar usuarios:', error);
     return false;
   }
 }
 
 // ==========================================
-// VALIDAR DOMINIO DEL CORREO
+// VALIDAR DOMINIO
 // ==========================================
 
-export function validarDominioCorreo(
-  correo
-) {
+export function validarDominioCorreo(correo) {
+  if (!correo) return false;
 
-  if (!correo) {
-    return false;
-  }
-
-  const correoNormalizado =
-    correo
-      .trim()
-      .toLowerCase();
+  const normalizado = correo.trim().toLowerCase();
 
   return DOMINIOS_PERMITIDOS.some(
-    (dominio) =>
-      correoNormalizado.endsWith(
-        dominio
-      )
+    dominio => normalizado.endsWith(dominio)
   );
 }
 
 // ==========================================
-// NORMALIZAR ROLES
+// NORMALIZAR ROL
 // ==========================================
 
-export function normalizarRol(
-  rol
-) {
-
-  const valor =
-    String(
-      rol || 'cliente'
-    )
-      .trim()
-      .toLowerCase();
-
-  // ADMINISTRADOR
+export function normalizarRol(rol) {
+  const valor = String(rol || 'cliente')
+    .trim()
+    .toLowerCase();
 
   if (
     valor === 'administrador' ||
@@ -163,8 +98,6 @@ export function normalizarRol(
     return 'admin';
   }
 
-  // VENDEDOR
-
   if (
     valor === 'vendedor' ||
     valor === 'seller'
@@ -172,216 +105,160 @@ export function normalizarRol(
     return 'vendedor';
   }
 
-  // CLIENTE
-
   return 'cliente';
 }
 
 // ==========================================
-// REGISTRAR USUARIO
+// REGISTRAR USUARIO LOCAL
+// COMPATIBILIDAD TEMPORAL
 // ==========================================
 
-export function registrarUsuario(
-  usuario
-) {
+export function registrarUsuario(usuario) {
+  const usuarios = obtenerUsuarios();
 
-  const usuarios =
-    obtenerUsuarios();
+  const correoNormalizado = usuario.correo
+    .trim()
+    .toLowerCase();
 
-  const correoNormalizado =
-    usuario.correo
-      .trim()
-      .toLowerCase();
-
-  // VALIDAR CORREO DUPLICADO
-
-  const existeCorreo =
+  if (
     usuarios.some(
-      (item) =>
-        item.correo
-          ?.toLowerCase() ===
+      item =>
+        item.correo?.toLowerCase() ===
         correoNormalizado
-    );
-
-  if (existeCorreo) {
-
+    )
+  ) {
     return {
       exito: false,
-      mensaje:
-        'Ya existe un usuario registrado con ese correo.'
+      mensaje: 'Ya existe un usuario registrado con ese correo.'
     };
   }
 
-  // VALIDAR RUN DUPLICADO
-
-  const existeRun =
+  if (
     usuarios.some(
-      (item) =>
+      item =>
         item.run &&
         usuario.run &&
         item.run.toUpperCase() ===
-          usuario.run.toUpperCase()
-    );
-
-  if (existeRun) {
-
+        usuario.run.toUpperCase()
+    )
+  ) {
     return {
       exito: false,
-      mensaje:
-        'Ya existe un usuario registrado con ese RUN.'
+      mensaje: 'Ya existe un usuario registrado con ese RUN.'
     };
   }
-
-  // CREAR USUARIO
 
   const nuevoUsuario = {
     ...usuario,
-
-    id:
-      usuario.id ||
-      `USR-${Date.now()}`,
-
-    correo:
-      correoNormalizado,
-
-    rol:
-      normalizarRol(
-        usuario.rol ||
-          'cliente'
-      ),
-
-    tipoUsuario:
-      usuario.tipoUsuario ||
-      'Cliente'
+    id: usuario.id || `USR-${Date.now()}`,
+    correo: correoNormalizado,
+    rol: normalizarRol(usuario.rol || 'cliente'),
+    tipoUsuario: usuario.tipoUsuario || 'Cliente'
   };
 
-  // GUARDAR
+  const guardado = guardarUsuarios([
+    ...usuarios,
+    nuevoUsuario
+  ]);
 
-  const guardado =
-    guardarUsuarios([
-      ...usuarios,
-      nuevoUsuario
-    ]);
-
-  if (!guardado) {
-
-    return {
-      exito: false,
-      mensaje:
-        'No fue posible registrar al usuario.'
-    };
-  }
-
-  return {
-    exito: true,
-    usuario:
-      nuevoUsuario
-  };
+  return guardado
+    ? { exito: true, usuario: nuevoUsuario }
+    : {
+        exito: false,
+        mensaje: 'No fue posible registrar al usuario.'
+      };
 }
 
 // ==========================================
-// INICIAR SESIÓN
+// INICIAR SESIÓN CON SPRING BOOT
 // ==========================================
 
-export function iniciarSesion(
-  correo,
-  password
-) {
-
-  const usuarios =
-    obtenerUsuarios();
-
-  const correoNormalizado =
-    correo
-      .trim()
-      .toLowerCase();
-
-  // BUSCAR USUARIO
-
-  const usuario =
-    usuarios.find(
-      (item) =>
-        item.correo
-          ?.toLowerCase() ===
-          correoNormalizado &&
-        (
-          item.password ??
-          item.contrasena
-        ) === password
+export async function iniciarSesion(correo, password) {
+  try {
+    const respuesta = await fetch(
+      `${API_URL}/auth/login`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          correo,
+          password
+        })
+      }
     );
 
-  if (!usuario) {
+    if (!respuesta.ok) {
+      return {
+        exito: false,
+        mensaje:
+          respuesta.status === 401 ||
+          respuesta.status === 403
+            ? 'Correo o contraseña incorrectos.'
+            : 'No fue posible iniciar sesión.'
+      };
+    }
+
+    const datos = await respuesta.json();
+
+    if (!datos.token) {
+      return {
+        exito: false,
+        mensaje: 'El servidor no entregó un token de acceso.'
+      };
+    }
+
+    const sesion = {
+      id: datos.id,
+      nombre: datos.nombre || '',
+      apellido: datos.apellido || '',
+      correo: datos.correo || correo,
+      telefono: datos.telefono || '',
+      direccion: datos.direccion || '',
+      region: datos.region || '',
+      comuna: datos.comuna || '',
+      rol: normalizarRol(datos.rol)
+    };
+
+    // Guardar token JWT
+    localStorage.setItem(
+      CLAVE_TOKEN,
+      datos.token
+    );
+
+    // Guardar datos de sesión
+    localStorage.setItem(
+      CLAVE_SESION,
+      JSON.stringify(sesion)
+    );
+
+    window.dispatchEvent(
+      new Event(EVENTO_SESION)
+    );
+
+    return {
+      exito: true,
+      usuario: sesion
+    };
+
+  } catch (error) {
+    console.error('Error de conexión con Spring Boot:', error);
 
     return {
       exito: false,
       mensaje:
-        'Correo o contraseña incorrectos.'
+        'No se pudo conectar con el backend. Verifica que Spring Boot esté ejecutándose.'
     };
   }
+}
 
-  // CREAR SESIÓN
+// ==========================================
+// OBTENER TOKEN JWT
+// ==========================================
 
-  const sesion = {
-
-    id:
-      usuario.id,
-
-    nombre:
-      usuario.nombre ||
-      '',
-
-    apellido:
-      usuario.apellido ||
-      '',
-
-    correo:
-      usuario.correo ||
-      '',
-
-    telefono:
-      usuario.telefono ||
-      '',
-
-    direccion:
-      usuario.direccion ||
-      '',
-
-    region:
-      usuario.region ||
-      '',
-
-    comuna:
-      usuario.comuna ||
-      '',
-
-    rol:
-      normalizarRol(
-        usuario.rol
-      )
-  };
-
-  // GUARDAR SESIÓN
-
-  localStorage.setItem(
-    CLAVE_SESION,
-    JSON.stringify(
-      sesion
-    )
-  );
-
-  // NOTIFICAR CAMBIO DE SESIÓN
-
-  window.dispatchEvent(
-    new Event(
-      EVENTO_SESION
-    )
-  );
-
-  return {
-    exito: true,
-    usuario:
-      sesion
-  };
+export function obtenerToken() {
+  return localStorage.getItem(CLAVE_TOKEN);
 }
 
 // ==========================================
@@ -389,26 +266,20 @@ export function iniciarSesion(
 // ==========================================
 
 export function obtenerSesion() {
-
   try {
-
-    const sesion =
-      JSON.parse(
-        localStorage.getItem(
-          CLAVE_SESION
-        )
-      );
-
-    return sesion ||
-      null;
-
-  } catch (error) {
-
-    console.error(
-      'Error al leer la sesión:',
-      error
+    const sesion = JSON.parse(
+      localStorage.getItem(CLAVE_SESION)
     );
 
+    // Una sesión antigua sin JWT no es válida
+    if (!sesion || !obtenerToken()) {
+      return null;
+    }
+
+    return sesion;
+
+  } catch (error) {
+    console.error('Error al leer la sesión:', error);
     return null;
   }
 }
@@ -418,28 +289,20 @@ export function obtenerSesion() {
 // ==========================================
 
 export function cerrarSesion() {
-
-  localStorage.removeItem(
-    CLAVE_SESION
-  );
+  localStorage.removeItem(CLAVE_SESION);
+  localStorage.removeItem(CLAVE_TOKEN);
 
   window.dispatchEvent(
-    new Event(
-      EVENTO_SESION
-    )
+    new Event(EVENTO_SESION)
   );
 
   return true;
 }
 
 // ==========================================
-// COMPROBAR SI EXISTE SESIÓN
+// COMPROBAR SESIÓN
 // ==========================================
 
 export function estaAutenticado() {
-
-  return (
-    obtenerSesion() !==
-    null
-  );
+  return obtenerSesion() !== null;
 }

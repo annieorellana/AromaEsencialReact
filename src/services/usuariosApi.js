@@ -1,29 +1,29 @@
 
+import { obtenerToken } from './authService';
+
 const API_URL = 'http://localhost:8080/api/v1/usuarios';
 
-// Obtiene el token cuando la autenticación JWT
-// esté integrada en el frontend.
-function obtenerToken() {
-  const sesion = JSON.parse(
-    localStorage.getItem('aromaesencial_sesion') || 'null'
-  );
+// ==========================================
+// FUNCIÓN GENERAL PARA SOLICITUDES HTTP
+// ==========================================
 
-  return sesion?.token || sesion?.accessToken || null;
-}
-
-// Función general para realizar solicitudes
 async function solicitar(ruta = '', opciones = {}) {
+
+  // Obtener token JWT de Spring Boot
   const token = obtenerToken();
 
+  // Preparar encabezados
   const headers = {
     'Content-Type': 'application/json',
     ...opciones.headers
   };
 
+  // Agregar autorización si existe token
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
 
+  // Realizar petición al backend
   const respuesta = await fetch(
     `${API_URL}${ruta}`,
     {
@@ -32,10 +32,16 @@ async function solicitar(ruta = '', opciones = {}) {
     }
   );
 
+  // ==========================================
+  // MANEJO DE ERRORES
+  // ==========================================
+
   if (!respuesta.ok) {
+
     let mensaje = `Error HTTP ${respuesta.status}`;
 
     try {
+
       const datos = await respuesta.json();
 
       mensaje =
@@ -43,7 +49,8 @@ async function solicitar(ruta = '', opciones = {}) {
         datos.message ||
         datos.detail ||
         mensaje;
-    } catch (error) {
+
+    } catch {
       // La respuesta puede no contener JSON.
     }
 
@@ -57,27 +64,45 @@ async function solicitar(ruta = '', opciones = {}) {
         'Se requiere una sesión de administrador válida en Spring Boot.';
     }
 
-    throw new Error(mensaje);
+    const error = new Error(mensaje);
+    error.status = respuesta.status;
+
+    throw error;
   }
 
+  // Respuesta sin contenido
   if (respuesta.status === 204) {
     return null;
   }
 
-  return respuesta.json();
+  // Convertir respuesta a JSON
+  const texto = await respuesta.text();
+
+  return texto ? JSON.parse(texto) : null;
 }
 
-// GET - Listar usuarios
+// ==========================================
+// GET - LISTAR USUARIOS
+// ==========================================
+
 export function listarUsuariosApi() {
   return solicitar();
 }
 
-// GET - Buscar usuario por ID
+// ==========================================
+// GET - BUSCAR USUARIO POR ID
+// ==========================================
+
 export function buscarUsuarioApi(id) {
-  return solicitar(`/${id}`);
+  return solicitar(
+    `/${encodeURIComponent(id)}`
+  );
 }
 
-// POST - Crear usuario
+// ==========================================
+// POST - CREAR USUARIO
+// ==========================================
+
 export function crearUsuarioApi(usuario) {
   return solicitar('', {
     method: 'POST',
@@ -85,17 +110,29 @@ export function crearUsuarioApi(usuario) {
   });
 }
 
-// PUT - Actualizar usuario
+// ==========================================
+// PUT - ACTUALIZAR USUARIO
+// ==========================================
+
 export function actualizarUsuarioApi(id, usuario) {
-  return solicitar(`/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(usuario)
-  });
+  return solicitar(
+    `/${encodeURIComponent(id)}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(usuario)
+    }
+  );
 }
 
-// DELETE - Eliminar usuario
+// ==========================================
+// DELETE - ELIMINAR USUARIO
+// ==========================================
+
 export function eliminarUsuarioApi(id) {
-  return solicitar(`/${id}`, {
-    method: 'DELETE'
-  });
+  return solicitar(
+    `/${encodeURIComponent(id)}`,
+    {
+      method: 'DELETE'
+    }
+  );
 }

@@ -1,6 +1,5 @@
-import React, {
-  useState
-} from 'react';
+
+import React, { useState } from 'react';
 
 import {
   Container,
@@ -24,152 +23,93 @@ import {
 
 function Login() {
 
-  const navigate =
-    useNavigate();
+  const navigate = useNavigate();
 
-  const [
-    correo,
-    setCorreo
-  ] = useState('');
+  const [correo, setCorreo] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [cargando, setCargando] = useState(false);
 
-  const [
-    password,
-    setPassword
-  ] = useState('');
-
-  const [
-    error,
-    setError
-  ] = useState('');
-
-  const enviarFormulario = (
-    e
-  ) => {
+  const enviarFormulario = async (e) => {
 
     e.preventDefault();
-
     setError('');
 
-    const correoLimpio =
-      correo
-        .trim()
-        .toLowerCase();
+    const correoLimpio = correo.trim().toLowerCase();
 
-    // ======================================
     // VALIDAR CORREO
-    // ======================================
 
     if (!correoLimpio) {
-
-      setError(
-        'El correo electrónico es obligatorio.'
-      );
-
+      setError('El correo electrónico es obligatorio.');
       return;
     }
 
-    if (
-      correoLimpio.length > 100
-    ) {
-
-      setError(
-        'El correo no puede superar los 100 caracteres.'
-      );
-
+    if (correoLimpio.length > 100) {
+      setError('El correo no puede superar los 100 caracteres.');
       return;
     }
 
-    if (
-      !validarDominioCorreo(
-        correoLimpio
-      )
-    ) {
-
+    if (!validarDominioCorreo(correoLimpio)) {
       setError(
         'Debe utilizar un correo @duoc.cl, @profesor.duoc.cl o @gmail.com.'
       );
-
       return;
     }
 
-    // ======================================
     // VALIDAR CONTRASEÑA
-    // ======================================
 
     if (!password) {
-
-      setError(
-        'La contraseña es obligatoria.'
-      );
-
+      setError('La contraseña es obligatoria.');
       return;
     }
 
-    if (
-      password.length < 4 ||
-      password.length > 10
-    ) {
+    setCargando(true);
 
-      setError(
-        'La contraseña debe tener entre 4 y 10 caracteres.'
-      );
+    try {
 
-      return;
-    }
+      // INICIAR SESIÓN CON SPRING BOOT
 
-    // ======================================
-    // INICIAR SESIÓN
-    // ======================================
-
-    const resultado =
-      iniciarSesion(
+      const resultado = await iniciarSesion(
         correoLimpio,
         password
       );
 
-    if (!resultado.exito) {
+      if (!resultado.exito) {
+        setError(
+          resultado.mensaje || 'No fue posible iniciar sesión.'
+        );
+        return;
+      }
+
+      // REDIRECCIÓN SEGÚN ROL
+
+      const rol = resultado.usuario.rol;
+
+      if (rol === 'admin') {
+        navigate('/admin');
+        return;
+      }
+
+      if (rol === 'vendedor') {
+        navigate('/vendedor/productos');
+        return;
+      }
+
+      navigate('/');
+
+    } catch (error) {
+
+      console.error('Error al iniciar sesión:', error);
 
       setError(
-        resultado.mensaje
+        'No fue posible conectar con el servidor.'
       );
 
-      return;
+    } finally {
+
+      setCargando(false);
+
     }
-
-    // ======================================
-    // REDIRECCIÓN SEGÚN ROL
-    // ======================================
-
-    const rol =
-      resultado.usuario.rol;
-
-    // ADMINISTRADOR
-
-    if (rol === 'admin') {
-
-      navigate(
-        '/admin'
-      );
-
-      return;
-    }
-
-    // VENDEDOR
-
-    if (
-      rol === 'vendedor'
-    ) {
-
-      navigate(
-        '/vendedor/productos'
-      );
-
-      return;
-    }
-
-    // CLIENTE
-
-    navigate('/');
   };
 
   return (
@@ -178,12 +118,7 @@ function Login() {
 
       <Row className="justify-content-center">
 
-        <Col
-          xs={12}
-          sm={10}
-          md={7}
-          lg={5}
-        >
+        <Col xs={12} sm={10} md={7} lg={5}>
 
           <Card className="shadow-sm">
 
@@ -202,20 +137,12 @@ function Login() {
               </div>
 
               {error && (
-
                 <Alert variant="danger">
                   {error}
                 </Alert>
-
               )}
 
-              <Form
-                onSubmit={
-                  enviarFormulario
-                }
-              >
-
-                {/* CORREO */}
+              <Form onSubmit={enviarFormulario}>
 
                 <Form.Group className="mb-3">
 
@@ -226,20 +153,13 @@ function Login() {
                   <Form.Control
                     type="email"
                     value={correo}
-                    onChange={
-                      (e) =>
-                        setCorreo(
-                          e.target.value
-                        )
-                    }
+                    onChange={(e) => setCorreo(e.target.value)}
                     maxLength={100}
                     placeholder="ejemplo@gmail.com"
                     required
                   />
 
                 </Form.Group>
-
-                {/* CONTRASEÑA */}
 
                 <Form.Group className="mb-4">
 
@@ -250,31 +170,19 @@ function Login() {
                   <Form.Control
                     type="password"
                     value={password}
-                    onChange={
-                      (e) =>
-                        setPassword(
-                          e.target.value
-                        )
-                    }
-                    minLength={4}
-                    maxLength={10}
+                    onChange={(e) => setPassword(e.target.value)}
                     required
                   />
 
-                  <Form.Text className="text-muted">
-                    Entre 4 y 10 caracteres.
-                  </Form.Text>
-
                 </Form.Group>
-
-                {/* BOTÓN */}
 
                 <Button
                   type="submit"
                   variant="dark"
                   className="w-100"
+                  disabled={cargando}
                 >
-                  Iniciar sesión
+                  {cargando ? 'Ingresando...' : 'Iniciar sesión'}
                 </Button>
 
               </Form>
