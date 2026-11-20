@@ -1,10 +1,10 @@
+
 import {
   validarDominioCorreo,
   normalizarRol,
-  registrarUsuario,
-  obtenerUsuarios,
   iniciarSesion,
   obtenerSesion,
+  obtenerToken,
   cerrarSesion,
   estaAutenticado
 } from '../services/authService';
@@ -15,271 +15,287 @@ import {
   eliminarProducto
 } from '../services/productoService';
 
-describe(
-  'Pruebas de Servicios: authService y productoService',
-  () => {
+describe('Pruebas de Servicios: autenticación JWT y productos', () => {
 
-    beforeEach(() => {
-      localStorage.clear();
-    });
+  let fetchOriginal;
 
-    // TEST 9: authService
-    it(
-      '9. authService - valida dominios y ejecuta correctamente el flujo de autenticación',
-      () => {
+  beforeEach(() => {
+    localStorage.clear();
 
-        // VALIDACIÓN DE DOMINIOS
-        expect(
-          validarDominioCorreo('usuario@gmail.com')
-        ).toBeTrue();
+    fetchOriginal = window.fetch;
+  });
 
-        expect(
-          validarDominioCorreo('alumno@duoc.cl')
-        ).toBeTrue();
+  afterEach(() => {
+    window.fetch = fetchOriginal;
 
-        expect(
-          validarDominioCorreo('docente@profesor.duoc.cl')
-        ).toBeTrue();
+    localStorage.clear();
+  });
 
-        expect(
-          validarDominioCorreo('usuario@hotmail.com')
-        ).toBeFalse();
+  // ==========================================
+  // TEST 9: AUTENTICACIÓN CON JWT
+  // ==========================================
 
-        expect(
-          validarDominioCorreo('')
-        ).toBeFalse();
+  it(
+    '9. authService - valida dominios e inicia y cierra sesión con JWT',
+    async () => {
 
-        // NORMALIZACIÓN DE ROLES
-        expect(
-          normalizarRol('Administrador')
-        ).toBe('admin');
+      // VALIDACIÓN DE DOMINIOS
 
-        expect(
-          normalizarRol('admin')
-        ).toBe('admin');
+      expect(
+        validarDominioCorreo('usuario@gmail.com')
+      ).toBeTrue();
 
-        expect(
-          normalizarRol('cliente')
-        ).toBe('cliente');
+      expect(
+        validarDominioCorreo('alumno@duoc.cl')
+      ).toBeTrue();
 
-        expect(
-          normalizarRol()
-        ).toBe('cliente');
+      expect(
+        validarDominioCorreo('docente@profesor.duoc.cl')
+      ).toBeTrue();
 
-        // USUARIO DE PRUEBA
-        const usuarioPrueba = {
-          id: 'USR-TEST-001',
-          run: '12345678-5',
-          nombre: 'Martina',
-          apellido: 'Aedo',
-          correo: 'MARTINA.TEST@GMAIL.COM',
-          password: '1234',
-          telefono: '999999999',
-          direccion: 'Dirección de prueba',
-          region: 'Metropolitana',
-          comuna: 'Santiago',
-          rol: 'cliente'
-        };
+      expect(
+        validarDominioCorreo('usuario@hotmail.com')
+      ).toBeFalse();
 
-        // REGISTRO
-        const registro = registrarUsuario(
-          usuarioPrueba
+      expect(
+        validarDominioCorreo('')
+      ).toBeFalse();
+
+      // NORMALIZACIÓN DE ROLES
+
+      expect(
+        normalizarRol('Administrador')
+      ).toBe('admin');
+
+      expect(
+        normalizarRol('admin')
+      ).toBe('admin');
+
+      expect(
+        normalizarRol('Vendedor')
+      ).toBe('vendedor');
+
+      expect(
+        normalizarRol('cliente')
+      ).toBe('cliente');
+
+      expect(
+        normalizarRol()
+      ).toBe('cliente');
+
+      // SIMULAR RESPUESTA DEL BACKEND
+
+      const respuestaLogin = {
+        token: 'jwt-token-de-prueba',
+        id: 1,
+        nombre: 'Martina',
+        apellido: 'Aedo',
+        correo: 'martina.test@gmail.com',
+        rol: 'ADMINISTRADOR'
+      };
+
+      const fetchSimulado = jasmine
+        .createSpy('fetch')
+        .and.returnValue(
+          Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => respuestaLogin
+          })
         );
 
-        expect(
-          registro.exito
-        ).toBeTrue();
+      window.fetch = fetchSimulado;
 
-        expect(
-          registro.usuario.correo
-        ).toBe(
-          'martina.test@gmail.com'
-        );
+      // INICIAR SESIÓN
 
-        expect(
-          registro.usuario.rol
-        ).toBe('cliente');
+      const resultado = await iniciarSesion(
+        'martina.test@gmail.com',
+        '1234'
+      );
 
-        // COMPROBAR USUARIO GUARDADO
-        const usuarios =
-          obtenerUsuarios();
+      expect(resultado.exito).toBeTrue();
 
-        expect(
-          usuarios.length
-        ).toBe(1);
+      expect(resultado.usuario.nombre).toBe('Martina');
 
-        expect(
-          usuarios[0].id
-        ).toBe('USR-TEST-001');
+      expect(resultado.usuario.rol).toBe('admin');
 
-        // CORREO DUPLICADO
-        const correoDuplicado =
-          registrarUsuario({
-            ...usuarioPrueba,
-            id: 'USR-TEST-002',
-            run: '11111111-1'
-          });
+      // VERIFICAR SOLICITUD A SPRING BOOT
 
-        expect(
-          correoDuplicado.exito
-        ).toBeFalse();
+      expect(fetchSimulado).toHaveBeenCalled();
 
-        expect(
-          correoDuplicado.mensaje
-        ).toContain('correo');
+      const [url, opciones] =
+        fetchSimulado.calls.mostRecent().args;
 
-        // RUN DUPLICADO
-        const runDuplicado =
-          registrarUsuario({
-            ...usuarioPrueba,
-            id: 'USR-TEST-003',
-            correo:
-              'otro.usuario@gmail.com'
-          });
+      expect(url).toBe(
+        'http://localhost:8080/api/v1/auth/login'
+      );
 
-        expect(
-          runDuplicado.exito
-        ).toBeFalse();
+      expect(opciones.method).toBe('POST');
 
-        expect(
-          runDuplicado.mensaje
-        ).toContain('RUN');
+      expect(
+        JSON.parse(opciones.body)
+      ).toEqual({
+        correo: 'martina.test@gmail.com',
+        password: '1234'
+      });
 
-        // LOGIN INCORRECTO
-        const loginIncorrecto =
-          iniciarSesion(
-            'martina.test@gmail.com',
-            '9999'
+      // VERIFICAR TOKEN
+
+      expect(obtenerToken()).toBe(
+        'jwt-token-de-prueba'
+      );
+
+      // VERIFICAR SESIÓN
+
+      const sesion = obtenerSesion();
+
+      expect(sesion).not.toBeNull();
+
+      expect(sesion.correo).toBe(
+        'martina.test@gmail.com'
+      );
+
+      expect(estaAutenticado()).toBeTrue();
+
+      // CERRAR SESIÓN
+
+      const cierre = cerrarSesion();
+
+      expect(cierre).toBeTrue();
+
+      expect(obtenerToken()).toBeNull();
+
+      expect(obtenerSesion()).toBeNull();
+
+      expect(estaAutenticado()).toBeFalse();
+    }
+  );
+
+  // ==========================================
+  // TEST 10: PRODUCTOS CON SPRING BOOT
+  // ==========================================
+
+  it(
+    '10. productoService - crea, consulta y elimina un producto mediante la API',
+    async () => {
+
+      const nuevoProducto = {
+        id: 'prod-100',
+        codigo: 'PF-100',
+        nombre: 'Aroma Test',
+        categoria: 'Unisex',
+        precio: 45000,
+        stock: 15,
+        stockCritico: 5,
+        descripcion: 'Producto de prueba',
+        oferta: false
+      };
+
+      let productosSimulados = [];
+
+      // SIMULAR LA API DE SPRING BOOT
+
+      const fetchSimulado = jasmine
+        .createSpy('fetch')
+        .and.callFake(async (url, opciones = {}) => {
+
+          const metodo = opciones.method || 'GET';
+
+          if (
+            url.endsWith('/productos') &&
+            metodo === 'POST'
+          ) {
+            const producto = JSON.parse(opciones.body);
+
+            productosSimulados.push(producto);
+
+            return {
+              ok: true,
+              status: 201,
+              text: async () => JSON.stringify(producto)
+            };
+          }
+
+          if (
+            url.endsWith('/productos') &&
+            metodo === 'GET'
+          ) {
+            return {
+              ok: true,
+              status: 200,
+              text: async () =>
+                JSON.stringify(productosSimulados)
+            };
+          }
+
+          if (
+            url.endsWith('/productos/prod-100') &&
+            metodo === 'DELETE'
+          ) {
+            productosSimulados = productosSimulados.filter(
+              producto => producto.id !== 'prod-100'
+            );
+
+            return {
+              ok: true,
+              status: 204
+            };
+          }
+
+          throw new Error(
+            `Solicitud inesperada: ${metodo} ${url}`
           );
+        });
 
-        expect(
-          loginIncorrecto.exito
-        ).toBeFalse();
+      window.fetch = fetchSimulado;
 
-        // LOGIN CORRECTO
-        const loginCorrecto =
-          iniciarSesion(
-            'martina.test@gmail.com',
-            '1234'
-          );
+      // CREAR PRODUCTO
 
-        expect(
-          loginCorrecto.exito
-        ).toBeTrue();
+      const productoCreado = await crearProducto(
+        nuevoProducto
+      );
 
-        expect(
-          loginCorrecto.usuario.nombre
-        ).toBe('Martina');
+      expect(productoCreado).toBeDefined();
 
-        expect(
-          loginCorrecto.usuario.rol
-        ).toBe('cliente');
+      expect(productoCreado.nombre).toBe('Aroma Test');
 
-        // SESIÓN ACTIVA
-        const sesion =
-          obtenerSesion();
+      // CONSULTAR PRODUCTOS
 
-        expect(
-          sesion
-        ).toBeDefined();
+      const productos = await obtenerProductos();
 
-        expect(
-          sesion.correo
-        ).toBe(
-          'martina.test@gmail.com'
-        );
+      expect(Array.isArray(productos)).toBeTrue();
 
-        expect(
-          estaAutenticado()
-        ).toBeTrue();
+      const productoEncontrado = productos.find(
+        producto => producto.id === 'prod-100'
+      );
 
-        // CERRAR SESIÓN
-        const cierre =
-          cerrarSesion();
+      expect(productoEncontrado).toBeDefined();
 
-        expect(
-          cierre
-        ).toBeTrue();
+      expect(productoEncontrado.precio).toBe(45000);
 
-        expect(
-          obtenerSesion()
-        ).toBeNull();
+      expect(productoEncontrado.stock).toBe(15);
 
-        expect(
-          estaAutenticado()
-        ).toBeFalse();
-      }
-    );
+      // ELIMINAR PRODUCTO
 
-    // TEST 10: productoService
-    it(
-      '10. productoService - debe crear un producto y dejarlo disponible en el catálogo',
-      () => {
+      const eliminado = await eliminarProducto(
+        'prod-100'
+      );
 
-        const nuevoProducto = {
-          id: 'prod-100',
-          codigo: 'PF-100',
-          nombre: 'Aroma Test',
-          categoria: 'Unisex',
-          precio: 45000,
-          stock: 15,
-          stockCritico: 5,
-          descripcion:
-            'Producto creado para prueba unitaria.',
-          imagen:
-            'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg"%3E%3C/svg%3E',
-          oferta: false
-        };
+      expect(eliminado).toBeTrue();
 
-        const spySetItem =
-          spyOn(
-            localStorage,
-            'setItem'
-          ).and.callThrough();
+      // COMPROBAR ELIMINACIÓN
 
-        crearProducto(
-          nuevoProducto
-        );
+      const productosRestantes =
+        await obtenerProductos();
 
-        const productos =
-          obtenerProductos();
+      expect(
+        productosRestantes.some(
+          producto => producto.id === 'prod-100'
+        )
+      ).toBeFalse();
 
-        const productoCreado =
-          productos.find(
-            (producto) =>
-              producto.id ===
-              'prod-100'
-          );
+      expect(fetchSimulado).toHaveBeenCalled();
+    }
+  );
 
-        expect(
-          Array.isArray(productos)
-        ).toBeTrue();
-
-        expect(
-          productoCreado
-        ).toBeDefined();
-
-        expect(
-          productoCreado.nombre
-        ).toBe('Aroma Test');
-
-        expect(
-          productoCreado.precio
-        ).toBe(45000);
-
-        expect(
-          productoCreado.stock
-        ).toBe(15);
-
-        expect(
-          spySetItem
-        ).toHaveBeenCalled();
-
-        eliminarProducto(
-          'prod-100'
-        );
-      }
-    );
-
-  }
-);
+});
