@@ -1,4 +1,4 @@
-
+/* global jasmine */
 import {
   validarDominioCorreo,
   normalizarRol,
