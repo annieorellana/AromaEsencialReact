@@ -1,6 +1,4 @@
-import React, {
-  useState
-} from 'react';
+import React, { useState } from 'react';
 
 import {
   Container,
@@ -18,77 +16,52 @@ import {
 } from 'react-router-dom';
 
 import {
-  iniciarSesion,
-  validarDominioCorreo
+  validarDominioCorreo,
+  iniciarSesion
 } from '../../services/authService';
 
 function Login() {
 
-  const navigate =
-    useNavigate();
+  const navigate = useNavigate();
 
-  const [
-    correo,
-    setCorreo
-  ] = useState('');
+  // ======================================
+  // ESTADOS DEL FORMULARIO
+  // ======================================
 
-  const [
-    password,
-    setPassword
-  ] = useState('');
+  const [correo, setCorreo] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [cargando, setCargando] = useState(false);
 
-  const [
-    error,
-    setError
-  ] = useState('');
+  // ======================================
+  // ENVIAR FORMULARIO
+  // ======================================
 
-  const enviarFormulario = (
-    e
-  ) => {
+  const enviarFormulario = async (e) => {
 
     e.preventDefault();
-
     setError('');
 
-    const correoLimpio =
-      correo
-        .trim()
-        .toLowerCase();
+    const correoLimpio = correo.trim().toLowerCase();
 
     // ======================================
     // VALIDAR CORREO
     // ======================================
 
     if (!correoLimpio) {
-
-      setError(
-        'El correo electrónico es obligatorio.'
-      );
-
+      setError('El correo electrónico es obligatorio.');
       return;
     }
 
-    if (
-      correoLimpio.length > 100
-    ) {
-
-      setError(
-        'El correo no puede superar los 100 caracteres.'
-      );
-
+    if (correoLimpio.length > 100) {
+      setError('El correo no puede superar los 100 caracteres.');
       return;
     }
 
-    if (
-      !validarDominioCorreo(
-        correoLimpio
-      )
-    ) {
-
+    if (!validarDominioCorreo(correoLimpio)) {
       setError(
         'Debe utilizar un correo @duoc.cl, @profesor.duoc.cl o @gmail.com.'
       );
-
       return;
     }
 
@@ -97,80 +70,78 @@ function Login() {
     // ======================================
 
     if (!password) {
-
-      setError(
-        'La contraseña es obligatoria.'
-      );
-
+      setError('La contraseña es obligatoria.');
       return;
     }
 
-    if (
-      password.length < 4 ||
-      password.length > 10
-    ) {
-
-      setError(
-        'La contraseña debe tener entre 4 y 10 caracteres.'
-      );
-
+    if (password.length > 128) {
+      setError('La contraseña es demasiado larga.');
       return;
     }
 
     // ======================================
-    // INICIAR SESIÓN
+    // INICIAR SESIÓN CON SPRING BOOT
     // ======================================
 
-    const resultado =
-      iniciarSesion(
+    setCargando(true);
+
+    try {
+
+      // Esta función llama a authApi.js,
+      // consulta Spring Boot y guarda el JWT.
+      const resultado = await iniciarSesion(
         correoLimpio,
         password
       );
 
-    if (!resultado.exito) {
+      // Verificar si el login fue exitoso
+      if (!resultado.exito) {
+        setError(
+          resultado.mensaje ||
+          'Correo o contraseña incorrectos.'
+        );
+        return;
+      }
+
+      // Obtener rol del usuario autenticado
+      const rol = resultado.usuario.rol;
+
+      // ======================================
+      // REDIRECCIÓN SEGÚN ROL
+      // ======================================
+
+      if (rol === 'admin') {
+        navigate('/admin', { replace: true });
+        return;
+      }
+
+      if (rol === 'vendedor') {
+        navigate('/vendedor/productos', {
+          replace: true
+        });
+        return;
+      }
+
+      // CLIENTE
+      navigate('/', { replace: true });
+
+    } catch (err) {
 
       setError(
-        resultado.mensaje
+        err.message ||
+        'Ocurrió un error al iniciar sesión.'
       );
 
-      return;
+    } finally {
+
+      setCargando(false);
+
     }
-
-    // ======================================
-    // REDIRECCIÓN SEGÚN ROL
-    // ======================================
-
-    const rol =
-      resultado.usuario.rol;
-
-    // ADMINISTRADOR
-
-    if (rol === 'admin') {
-
-      navigate(
-        '/admin'
-      );
-
-      return;
-    }
-
-    // VENDEDOR
-
-    if (
-      rol === 'vendedor'
-    ) {
-
-      navigate(
-        '/vendedor/productos'
-      );
-
-      return;
-    }
-
-    // CLIENTE
-
-    navigate('/');
   };
+
+  // ======================================
+  // DISEÑO DEL LOGIN
+  // ======================================
 
   return (
 
@@ -201,19 +172,17 @@ function Login() {
 
               </div>
 
-              {error && (
+              {/* MOSTRAR ERRORES */}
 
+              {error && (
                 <Alert variant="danger">
                   {error}
                 </Alert>
-
               )}
 
-              <Form
-                onSubmit={
-                  enviarFormulario
-                }
-              >
+              {/* FORMULARIO */}
+
+              <Form onSubmit={enviarFormulario}>
 
                 {/* CORREO */}
 
@@ -226,14 +195,13 @@ function Login() {
                   <Form.Control
                     type="email"
                     value={correo}
-                    onChange={
-                      (e) =>
-                        setCorreo(
-                          e.target.value
-                        )
+                    onChange={(e) =>
+                      setCorreo(e.target.value)
                     }
                     maxLength={100}
                     placeholder="ejemplo@gmail.com"
+                    autoComplete="username"
+                    disabled={cargando}
                     required
                   />
 
@@ -250,36 +218,38 @@ function Login() {
                   <Form.Control
                     type="password"
                     value={password}
-                    onChange={
-                      (e) =>
-                        setPassword(
-                          e.target.value
-                        )
+                    onChange={(e) =>
+                      setPassword(e.target.value)
                     }
-                    minLength={4}
-                    maxLength={10}
+                    autoComplete="current-password"
+                    disabled={cargando}
                     required
                   />
 
                   <Form.Text className="text-muted">
-                    Entre 4 y 10 caracteres.
+                    Ingresa la contraseña de tu cuenta.
                   </Form.Text>
 
                 </Form.Group>
 
-                {/* BOTÓN */}
+                {/* BOTÓN INICIAR SESIÓN */}
 
                 <Button
                   type="submit"
                   variant="dark"
                   className="w-100"
+                  disabled={cargando}
                 >
-                  Iniciar sesión
+                  {cargando
+                    ? 'Iniciando sesión...'
+                    : 'Iniciar sesión'}
                 </Button>
 
               </Form>
 
               <hr />
+
+              {/* REGISTRO */}
 
               <p className="text-center mb-0">
 

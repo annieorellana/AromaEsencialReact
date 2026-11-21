@@ -128,7 +128,7 @@ function Registro() {
     }));
   };
 
-  const enviarFormulario = (e) => {
+  const enviarFormulario = async (e) => {
     e.preventDefault();
 
     setError('');
@@ -220,11 +220,11 @@ function Registro() {
     }
 
     if (
-      datos.password.length < 4 ||
-      datos.password.length > 10
+      datos.password.length < 8 ||
+      datos.password.length > 128
     ) {
       setError(
-        'La contraseña debe tener entre 4 y 10 caracteres.'
+        'La contraseña debe tener entre 8 y 128 caracteres.'
       );
 
       return;
@@ -294,8 +294,7 @@ function Registro() {
     }
 
     // REGISTRAR CON AUTHSERVICE
-    const resultado =
-      registrarUsuario({
+    const resultado = await registrarUsuario({
         run: datos.run
           .replace(/\./g, '')
           .replace(/-/g, '')
@@ -506,13 +505,13 @@ function Registro() {
                         name="password"
                         value={datos.password}
                         onChange={handleChange}
-                        minLength={4}
-                        maxLength={10}
+                        minLength={8}
+                        maxLength={128}
                         required
                       />
 
                       <Form.Text className="text-muted">
-                        Entre 4 y 10 caracteres.
+                        Entre 8 y 128 caracteres.
                       </Form.Text>
 
                     </Form.Group>
@@ -531,8 +530,8 @@ function Registro() {
                         name="confirmarPassword"
                         value={datos.confirmarPassword}
                         onChange={handleChange}
-                        minLength={4}
-                        maxLength={10}
+                        minLength={8}
+                        maxLength={128}
                         required
                       />
 
