@@ -12,10 +12,9 @@ import AdminOrdenDetalle from '../pages/admin/AdminOrdenDetalle';
 import AdminUsuarios from '../pages/admin/AdminUsuarios';
 import AdminReportes from '../pages/admin/AdminReportes';
 import AdminPerfil from '../pages/admin/AdminPerfil';
-import { sembrarAdminDemo } from '../utils/sembrarAdmin';
 
-// Garantiza que exista un administrador para poder entrar (admin@duoc.cl / admin123). 
-sembrarAdminDemo();
+
+
 
 // Todas las rutas /admin exigen sesión con rol "admin" (RutaProtegida existente).
 export const adminRoutes = (

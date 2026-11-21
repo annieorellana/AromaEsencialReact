@@ -22,15 +22,6 @@ import SellerOrdenes
 import SellerOrdenDetalle
   from '../pages/seller/SellerOrdenDetalle';
 
-import {
-  sembrarVendedorDemo
-} from '../utils/sembrarVendedor';
-
-// ==========================================
-// CREAR VENDEDOR DEMO SI NO EXISTE
-// ==========================================
-
-sembrarVendedorDemo();
 
 // ==========================================
 // RUTAS DEL VENDEDOR

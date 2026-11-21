@@ -261,9 +261,10 @@ export function obtenerToken() {
   return localStorage.getItem(CLAVE_TOKEN);
 }
 
-// ==========================================
-// OBTENER SESIÓN ACTUAL
-// ==========================================
+    // Conservamos los datos del usuario actual
+    const sesionGuardada = sessionStorage.getItem(
+      CLAVE_SESION
+    );
 
 export function obtenerSesion() {
   try {
@@ -298,6 +299,25 @@ export function cerrarSesion() {
 
   return true;
 }
+
+export async function cerrarSesionCompleta() {
+  try {
+    // Revocar el refresh token y eliminar
+    // la cookie HttpOnly desde Spring Boot.
+    await cerrarSesionAPI();
+
+  } catch (error) {
+    console.error(
+      'No fue posible cerrar la sesión en el servidor:',
+      error
+    );
+
+  } finally {
+    // Eliminar siempre la sesión local.
+    cerrarSesion();
+  }
+}
+
 
 // ==========================================
 // COMPROBAR SESIÓN

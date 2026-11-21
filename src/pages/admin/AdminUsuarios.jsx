@@ -11,6 +11,7 @@ import {
 
 import PlantillaPagina from '../../components/templates/admin/PlantillaPagina';
 import BarraFiltros from '../../components/molecules/admin/BarraFiltros';
+import CampoFormulario from '../../components/molecules/admin/CampoFormulario';
 import TablaUsuarios, {
   ROLES
 } from '../../components/organisms/admin/TablaUsuarios';
@@ -262,19 +263,16 @@ function AdminUsuarios() {
         placeholder="Buscar por RUN, nombre o correo"
         etiqueta="Buscar usuarios"
       >
-        <Form.Select
+        <CampoFormulario
+          id="filtro-rol"
+          etiqueta=""
+          tipo="select"
           aria-label="Filtrar por rol"
-          value={rol}
-          onChange={(e) => setRol(e.target.value)}
-        >
-          <option value="">Todos los roles</option>
-
-          {ROLES.map((opcion) => (
-            <option key={opcion} value={opcion}>
-              {opcion}
-            </option>
-          ))}
-        </Form.Select>
+          opciones={ROLES}
+          placeholder="Todos los roles"
+          valor={rol}
+          onCambio={(e) => setRol(e.target.value)}
+        />
       </BarraFiltros>
 
       {cargando ? (

@@ -2,20 +2,50 @@ import { useEffect, useState } from 'react';
 
 import {
   obtenerSesion,
-  cerrarSesion,
+  renovarSesion,
+  cerrarSesionCompleta,
   EVENTO_SESION
 } from '../services/authService';
 
 function useAuth() {
+
   const [usuario, setUsuario] = useState(
     obtenerSesion
   );
 
+  const [verificandoSesion, setVerificandoSesion] =
+    useState(true);
+
   useEffect(() => {
+
+    let activo = true;
+
+    async function comprobarSesion() {
+
+      const sesionActual = obtenerSesion();
+
+      if (sesionActual) {
+        if (activo) {
+          setUsuario(sesionActual);
+          setVerificandoSesion(false);
+        }
+        return;
+      }
+
+      // Si el JWT venció, intentar renovarlo
+      // utilizando la cookie HttpOnly.
+      const sesionRenovada = await renovarSesion();
+
+      if (activo) {
+        setUsuario(sesionRenovada);
+        setVerificandoSesion(false);
+      }
+    }
+
     const actualizarSesion = () => {
-      setUsuario(
-        obtenerSesion()
-      );
+      if (activo) {
+        setUsuario(obtenerSesion());
+      }
     };
 
     window.addEventListener(
@@ -28,7 +58,11 @@ function useAuth() {
       actualizarSesion
     );
 
+    comprobarSesion();
+
     return () => {
+      activo = false;
+
       window.removeEventListener(
         EVENTO_SESION,
         actualizarSesion
@@ -39,17 +73,19 @@ function useAuth() {
         actualizarSesion
       );
     };
+
   }, []);
 
-  const logout = () => {
-    cerrarSesion();
+  const logout = async () => {
+    await cerrarSesionCompleta();
     setUsuario(null);
-  };
+};
 
   return {
     usuario,
     autenticado: usuario !== null,
     rol: usuario?.rol || null,
+    verificandoSesion,
     logout
   };
 }

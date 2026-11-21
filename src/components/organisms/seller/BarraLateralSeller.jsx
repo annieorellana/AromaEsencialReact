@@ -24,16 +24,15 @@ function BarraLateralSeller({
     logout
   } = useAuth();
 
-  const cerrarSesion = () => {
 
-    if (
-      typeof logout === 'function'
-    ) {
-      logout();
-    }
+const cerrarSesion = async () => {
+  if (typeof logout === 'function') {
+    await logout();
+  }
 
-    navigate('/');
-  };
+  navigate('/');
+};
+
 
   return (
     <aside

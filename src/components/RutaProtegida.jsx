@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
@@ -6,11 +7,20 @@ function RutaProtegida({
   children,
   rolesPermitidos = []
 }) {
+
   const {
     autenticado,
-    rol
+    rol,
+    verificandoSesion
   } = useAuth();
 
+  // Esperar mientras se comprueba o renueva
+  // la sesión del usuario
+  if (verificandoSesion) {
+    return <p>Verificando sesión...</p>;
+  }
+
+  // Usuario sin sesión válida
   if (!autenticado) {
     return (
       <Navigate
@@ -20,6 +30,7 @@ function RutaProtegida({
     );
   }
 
+  // Usuario sin el rol necesario
   if (
     rolesPermitidos.length > 0 &&
     !rolesPermitidos.includes(rol)
