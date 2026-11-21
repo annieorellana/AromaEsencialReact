@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 
 import {
@@ -8,7 +9,8 @@ import {
   Badge,
   Alert,
   Button,
-  Form
+  Form,
+  Spinner
 } from 'react-bootstrap';
 
 import {
@@ -25,26 +27,55 @@ import {
 
 function ProductoDetalle({ onAgregar }) {
 
-  // OBTENER ID DEL PRODUCTO
+  // OBTENER ID DESDE LA URL
   const { id } = useParams();
 
-  // OBTENER PRODUCTOS
+  // OBTENER PRODUCTOS DESDE SPRING BOOT
   const productos = useProductos();
 
-  // BUSCAR PRODUCTO SELECCIONADO
+  // BUSCAR PRODUCTO POR ID
+  // String permite comparar IDs numericos y de texto
   const producto = productos.find(
-    (item) => item.id === id
+    (item) => String(item.id) === String(id)
   );
 
   // ESTADOS
   const [cantidad, setCantidad] = useState(1);
   const [mensaje, setMensaje] = useState('');
+  const [cargando, setCargando] = useState(true);
 
   // REINICIAR AL CAMBIAR DE PRODUCTO
   useEffect(() => {
     setCantidad(1);
     setMensaje('');
   }, [id]);
+
+  // ESPERAR LA CARGA INICIAL DE PRODUCTOS
+  useEffect(() => {
+    // Tiempo breve para permitir la consulta inicial
+    const temporizador = setTimeout(() => {
+      setCargando(false);
+    }, 1000);
+
+    return () => clearTimeout(temporizador);
+  }, []);
+
+  // PANTALLA DE CARGA
+  if (cargando && !producto) {
+    return (
+      <Container className="py-5 text-center">
+        <Spinner
+          animation="border"
+          variant="secondary"
+          className="mb-3"
+        />
+
+        <p className="text-muted">
+          Cargando información del perfume...
+        </p>
+      </Container>
+    );
+  }
 
   // PRODUCTO NO ENCONTRADO
   if (!producto) {
@@ -63,7 +94,7 @@ function ProductoDetalle({ onAgregar }) {
     );
   }
 
-  // INFORMACIÓN OLFATIVA
+  // INFORMACION OLFATIVA
   const perfil = obtenerPerfilOlfativo(producto);
 
   // STOCK DISPONIBLE
@@ -76,12 +107,12 @@ function ProductoDetalle({ onAgregar }) {
   const relacionados = productos
     .filter(
       (item) =>
-        item.id !== producto.id &&
+        String(item.id) !== String(producto.id) &&
         item.categoria === producto.categoria
     )
     .slice(0, 3);
 
-  // CANTIDAD VÁLIDA
+  // CANTIDAD VALIDA
   const unidades = Math.min(
     stock,
     Math.max(1, Number(cantidad) || 1)
@@ -94,6 +125,11 @@ function ProductoDetalle({ onAgregar }) {
       return;
     }
 
+    if (typeof onAgregar !== 'function') {
+      setMensaje('No se pudo agregar el producto al carrito.');
+      return;
+    }
+
     for (let i = 0; i < unidades; i += 1) {
       onAgregar(producto);
     }
@@ -103,7 +139,7 @@ function ProductoDetalle({ onAgregar }) {
     );
   };
 
-  // FICHA TÉCNICA DEL PERFUME
+  // FICHA TECNICA DEL PERFUME
   const ficha = [
     ['Familia olfativa', perfil.familia],
     ['Concentración', perfil.concentracion],
@@ -112,7 +148,7 @@ function ProductoDetalle({ onAgregar }) {
     ['Ideal para', perfil.ocasion]
   ];
 
-  // PIRÁMIDE OLFATIVA
+  // PIRAMIDE OLFATIVA
   const notas = [
     {
       titulo: 'Salida',
@@ -141,15 +177,11 @@ function ProductoDetalle({ onAgregar }) {
 
     <Container className="py-5">
 
-      {/* =====================================
-          INFORMACIÓN PRINCIPAL
-      ===================================== */}
+      {/* INFORMACION PRINCIPAL */}
 
       <Row className="g-4 mb-5">
 
-        {/* =====================================
-            IMAGEN COMPLETA DEL PERFUME
-        ===================================== */}
+        {/* IMAGEN DEL PERFUME */}
 
         <Col md={6}>
 
@@ -184,9 +216,7 @@ function ProductoDetalle({ onAgregar }) {
 
         </Col>
 
-        {/* =====================================
-            DATOS DEL PRODUCTO
-        ===================================== */}
+        {/* DATOS DEL PRODUCTO */}
 
         <Col md={6}>
 
@@ -213,7 +243,7 @@ function ProductoDetalle({ onAgregar }) {
 
           <Price value={producto.precio} />
 
-          {/* DESCRIPCIÓN */}
+          {/* DESCRIPCION */}
 
           <h4 className="mt-4">
             Descripción
@@ -223,9 +253,7 @@ function ProductoDetalle({ onAgregar }) {
             {perfil.descripcion}
           </p>
 
-          {/* =====================================
-              FICHA OLFATIVA
-          ===================================== */}
+          {/* FICHA OLFATIVA */}
 
           <Row className="g-3 my-3">
 
@@ -255,9 +283,7 @@ function ProductoDetalle({ onAgregar }) {
 
           </Row>
 
-          {/* =====================================
-              INFORMACIÓN DE INVENTARIO
-          ===================================== */}
+          {/* INFORMACION DE INVENTARIO */}
 
           <p>
             <strong>Código:</strong>{' '}
@@ -274,7 +300,7 @@ function ProductoDetalle({ onAgregar }) {
             {stock}
           </p>
 
-          {/* ALERTA STOCK CRÍTICO */}
+          {/* ALERTA STOCK CRITICO */}
 
           {stock > 0 &&
             stock <=
@@ -284,7 +310,7 @@ function ProductoDetalle({ onAgregar }) {
                 Quedan pocas unidades disponibles.
               </Alert>
 
-            )}
+          )}
 
           {/* ALERTA SIN STOCK */}
 
@@ -296,9 +322,7 @@ function ProductoDetalle({ onAgregar }) {
 
           )}
 
-          {/* =====================================
-              SELECTOR DE CANTIDAD
-          ===================================== */}
+          {/* SELECTOR DE CANTIDAD */}
 
           <Form.Group
             className="mb-3"
@@ -366,9 +390,7 @@ function ProductoDetalle({ onAgregar }) {
 
           </Form.Group>
 
-          {/* =====================================
-              BOTÓN AGREGAR AL CARRITO
-          ===================================== */}
+          {/* BOTON AGREGAR AL CARRITO */}
 
           <Button
             variant="dark"
@@ -378,7 +400,7 @@ function ProductoDetalle({ onAgregar }) {
             Añadir al carrito
           </Button>
 
-          {/* MENSAJE DE CONFIRMACIÓN */}
+          {/* MENSAJE DE CONFIRMACION */}
 
           {mensaje && (
 
@@ -396,9 +418,7 @@ function ProductoDetalle({ onAgregar }) {
 
       </Row>
 
-      {/* =====================================
-          PIRÁMIDE OLFATIVA
-      ===================================== */}
+      {/* PIRAMIDE OLFATIVA */}
 
       <section className="mb-5">
 
@@ -480,9 +500,7 @@ function ProductoDetalle({ onAgregar }) {
 
       </section>
 
-      {/* =====================================
-          PRODUCTOS RELACIONADOS
-      ===================================== */}
+      {/* PRODUCTOS RELACIONADOS */}
 
       <section>
 
@@ -501,7 +519,7 @@ function ProductoDetalle({ onAgregar }) {
 
               <Card className="h-100 shadow-sm">
 
-                {/* IMAGEN COMPLETA */}
+                {/* IMAGEN DEL PRODUCTO */}
 
                 <Card.Img
                   variant="top"

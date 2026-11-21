@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
@@ -8,6 +9,11 @@ import ProductImage from '../atoms/ProductImage';
 import Badge from '../atoms/Badge';
 
 function ProductCard({ producto, onAgregar }) {
+  const categoria =
+    producto.categoriaNombre || producto.categoria || '';
+
+  const stock = Number(producto.stock ?? 0);
+
   return (
     <Card className="h-100 shadow-sm">
       <ProductImage
@@ -17,9 +23,11 @@ function ProductCard({ producto, onAgregar }) {
 
       <Card.Body className="d-flex flex-column">
         <div className="mb-2">
-          <Badge bg="secondary">
-            {producto.categoria}
-          </Badge>
+          {categoria && (
+            <Badge bg="secondary">
+              {categoria}
+            </Badge>
+          )}
 
           {producto.oferta && (
             <Badge bg="danger">
@@ -40,14 +48,18 @@ function ProductCard({ producto, onAgregar }) {
           <Price value={producto.precio} />
 
           <p className="text-muted mt-2">
-            Stock: {producto.stock}
+            Stock: {stock}
           </p>
 
           <Button
             variant="dark"
             className="w-100"
-            onClick={() => onAgregar(producto)}
-            disabled={producto.stock === 0}
+            onClick={() => {
+              if (typeof onAgregar === 'function') {
+                onAgregar(producto);
+              }
+            }}
+            disabled={stock <= 0}
           >
             Agregar al carrito
           </Button>

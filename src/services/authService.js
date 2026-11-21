@@ -1,22 +1,13 @@
-import {
-  iniciarSesionAPI,
-  registrarUsuarioAPI,
-  renovarSesionAPI,
-  cerrarSesionAPI,
-} from './authApi';
 
-// ==========================================
-// CLAVES DE ALMACENAMIENTO
-// ==========================================
+const API_URL = 'http://localhost:8080/api/v1';
 
+const CLAVE_USUARIOS = 'aromaesencial_usuarios';
+const CLAVE_USUARIOS_ANTIGUA = 'aromaesencial-users';
 const CLAVE_SESION = 'aromaesencial_sesion';
+const CLAVE_TOKEN = 'aromaesencial_token';
 
 export const EVENTO_SESION =
   'aromaesencial-sesion-actualizada';
-
-// ==========================================
-// DOMINIOS PERMITIDOS
-// ==========================================
 
 export const DOMINIOS_PERMITIDOS = [
   '@duoc.cl',
@@ -25,31 +16,78 @@ export const DOMINIOS_PERMITIDOS = [
 ];
 
 // ==========================================
-// VALIDAR DOMINIO DEL CORREO
+// OBTENER USUARIOS LOCALES
+// ==========================================
+
+export function obtenerUsuarios() {
+  try {
+    const actuales = JSON.parse(
+      localStorage.getItem(CLAVE_USUARIOS) || '[]'
+    );
+
+    const antiguos = JSON.parse(
+      localStorage.getItem(CLAVE_USUARIOS_ANTIGUA) || '[]'
+    );
+
+    const combinados = [
+      ...(Array.isArray(actuales) ? actuales : []),
+      ...(Array.isArray(antiguos) ? antiguos : [])
+    ];
+
+    return combinados.filter(
+      (usuario, index, arreglo) =>
+        index === arreglo.findIndex(
+          item =>
+            item.correo?.toLowerCase() ===
+            usuario.correo?.toLowerCase()
+        )
+    );
+
+  } catch (error) {
+    console.error('Error al leer usuarios:', error);
+    return [];
+  }
+}
+
+// ==========================================
+// GUARDAR USUARIOS LOCALES
+// ==========================================
+
+export function guardarUsuarios(usuarios) {
+  try {
+    localStorage.setItem(
+      CLAVE_USUARIOS,
+      JSON.stringify(usuarios)
+    );
+
+    return true;
+
+  } catch (error) {
+    console.error('Error al guardar usuarios:', error);
+    return false;
+  }
+}
+
+// ==========================================
+// VALIDAR DOMINIO
 // ==========================================
 
 export function validarDominioCorreo(correo) {
+  if (!correo) return false;
 
-  if (!correo) {
-    return false;
-  }
-
-  const correoNormalizado =
-    correo.trim().toLowerCase();
+  const normalizado = correo.trim().toLowerCase();
 
   return DOMINIOS_PERMITIDOS.some(
-    (dominio) =>
-      correoNormalizado.endsWith(dominio)
+    dominio => normalizado.endsWith(dominio)
   );
 }
 
 // ==========================================
-// NORMALIZAR ROLES
+// NORMALIZAR ROL
 // ==========================================
 
 export function normalizarRol(rol) {
-
-  const valor = String(rol || '')
+  const valor = String(rol || 'cliente')
     .trim()
     .toLowerCase();
 
@@ -67,54 +105,68 @@ export function normalizarRol(rol) {
     return 'vendedor';
   }
 
-  if (valor === 'cliente') {
-    return 'cliente';
-  }
-
-  return null;
+  return 'cliente';
 }
 
 // ==========================================
-// GUARDAR SESIÓN DESDE LA API
+// REGISTRAR USUARIO LOCAL
+// COMPATIBILIDAD TEMPORAL
 // ==========================================
 
-export function guardarSesionAPI(datos) {
+export function registrarUsuario(usuario) {
+  const usuarios = obtenerUsuarios();
 
-  if (!datos || !datos.token) {
-    throw new Error(
-      'El servidor no devolvió un token JWT.'
-    );
+  const correoNormalizado = usuario.correo
+    .trim()
+    .toLowerCase();
+
+  if (
+    usuarios.some(
+      item =>
+        item.correo?.toLowerCase() ===
+        correoNormalizado
+    )
+  ) {
+    return {
+      exito: false,
+      mensaje: 'Ya existe un usuario registrado con ese correo.'
+    };
   }
 
-  const rol = normalizarRol(datos.rol);
-
-  if (!rol) {
-    throw new Error(
-      'El servidor devolvió un rol desconocido.'
-    );
+  if (
+    usuarios.some(
+      item =>
+        item.run &&
+        usuario.run &&
+        item.run.toUpperCase() ===
+        usuario.run.toUpperCase()
+    )
+  ) {
+    return {
+      exito: false,
+      mensaje: 'Ya existe un usuario registrado con ese RUN.'
+    };
   }
 
-  const sesion = {
-    id: datos.id,
-    nombre: datos.nombre || '',
-    correo: datos.correo || '',
-    rol: rol,
-    token: datos.token
+  const nuevoUsuario = {
+    ...usuario,
+    id: usuario.id || `USR-${Date.now()}`,
+    correo: correoNormalizado,
+    rol: normalizarRol(usuario.rol || 'cliente'),
+    tipoUsuario: usuario.tipoUsuario || 'Cliente'
   };
 
-  sessionStorage.setItem(
-    CLAVE_SESION,
-    JSON.stringify(sesion)
-  );
+  const guardado = guardarUsuarios([
+    ...usuarios,
+    nuevoUsuario
+  ]);
 
-  // Eliminar una posible sesión antigua
-  localStorage.removeItem(CLAVE_SESION);
-
-  window.dispatchEvent(
-    new Event(EVENTO_SESION)
-  );
-
-  return sesion;
+  return guardado
+    ? { exito: true, usuario: nuevoUsuario }
+    : {
+        exito: false,
+        mensaje: 'No fue posible registrar al usuario.'
+      };
 }
 
 // ==========================================
@@ -122,17 +174,68 @@ export function guardarSesionAPI(datos) {
 // ==========================================
 
 export async function iniciarSesion(correo, password) {
-
   try {
-
-    // Enviar las credenciales a la API
-    const datos = await iniciarSesionAPI(
-      correo.trim().toLowerCase(),
-      password
+    const respuesta = await fetch(
+      `${API_URL}/auth/login`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          correo,
+          password
+        })
+      }
     );
 
-    // Guardar la sesión recibida
-    const sesion = guardarSesionAPI(datos);
+    if (!respuesta.ok) {
+      return {
+        exito: false,
+        mensaje:
+          respuesta.status === 401 ||
+          respuesta.status === 403
+            ? 'Correo o contraseña incorrectos.'
+            : 'No fue posible iniciar sesión.'
+      };
+    }
+
+    const datos = await respuesta.json();
+
+    if (!datos.token) {
+      return {
+        exito: false,
+        mensaje: 'El servidor no entregó un token de acceso.'
+      };
+    }
+
+    const sesion = {
+      id: datos.id,
+      nombre: datos.nombre || '',
+      apellido: datos.apellido || '',
+      correo: datos.correo || correo,
+      telefono: datos.telefono || '',
+      direccion: datos.direccion || '',
+      region: datos.region || '',
+      comuna: datos.comuna || '',
+      rol: normalizarRol(datos.rol)
+    };
+
+    // Guardar token JWT
+    localStorage.setItem(
+      CLAVE_TOKEN,
+      datos.token
+    );
+
+    // Guardar datos de sesión
+    localStorage.setItem(
+      CLAVE_SESION,
+      JSON.stringify(sesion)
+    );
+
+    window.dispatchEvent(
+      new Event(EVENTO_SESION)
+    );
 
     return {
       exito: true,
@@ -140,142 +243,45 @@ export async function iniciarSesion(correo, password) {
     };
 
   } catch (error) {
+    console.error('Error de conexión con Spring Boot:', error);
 
     return {
       exito: false,
       mensaje:
-        error.message ||
-        'No fue posible iniciar sesión.'
+        'No se pudo conectar con el backend. Verifica que Spring Boot esté ejecutándose.'
     };
   }
 }
 
 // ==========================================
-// OBTENER SESIÓN ACTUAL
+// OBTENER TOKEN JWT
 // ==========================================
 
-export function obtenerSesion() {
-
-  try {
-
-    const datos = sessionStorage.getItem(
-      CLAVE_SESION
-    );
-
-    if (!datos) {
-      return null;
-    }
-
-    const sesion = JSON.parse(datos);
-
-    if (!sesion || !sesion.token) {
-      return null;
-    }
-
-    // Comprobar el vencimiento del JWT
-    const partes = sesion.token.split('.');
-
-    if (partes.length !== 3) {
-      cerrarSesion();
-      return null;
-    }
-
-    const base64 = partes[1]
-      .replace(/-/g, '+')
-      .replace(/_/g, '/');
-
-    const payload = JSON.parse(
-      atob(base64)
-    );
-
-    const ahora = Math.floor(
-      Date.now() / 1000
-    );
-
-    if (
-      typeof payload.exp !== 'number' ||
-      payload.exp <= ahora
-  ) {
-  // El JWT venció, pero todavía puede
-  // existir una cookie de renovación válida.
-    return null;
-  }
-
-    return sesion;
-
-  } catch (error) {
-
-    console.error(
-      'Error al recuperar la sesión:',
-      error
-    );
-
-    return null;
-  }
+export function obtenerToken() {
+  return localStorage.getItem(CLAVE_TOKEN);
 }
-
- // ==========================================
- // RENOVAR SESIÓN CON SPRING BOOT
- // ==========================================
-
-// Evitar varias renovaciones simultáneas
-let renovacionEnCurso = null;
-
-export async function renovarSesion() {
-
-  if (renovacionEnCurso) {
-    return renovacionEnCurso;
-  }
-
-  renovacionEnCurso = (async () => {
 
     // Conservamos los datos del usuario actual
     const sesionGuardada = sessionStorage.getItem(
       CLAVE_SESION
     );
 
-    if (!sesionGuardada) {
-      return null;
-    }
-
-    try {
-      const sesion = JSON.parse(sesionGuardada);
-
-      // Spring Boot renueva la cookie HttpOnly
-      // y devuelve un nuevo JWT de acceso
-      const respuesta = await renovarSesionAPI();
-
-      const nuevaSesion = {
-        ...sesion,
-        token: respuesta.token
-      };
-
-      sessionStorage.setItem(
-        CLAVE_SESION,
-        JSON.stringify(nuevaSesion)
-      );
-
-      window.dispatchEvent(
-        new Event(EVENTO_SESION)
-      );
-
-      return nuevaSesion;
-
-    } catch (error) {
-      console.error(
-        'No fue posible renovar la sesión:',
-        error
-      );
-
-      cerrarSesion();
-      return null;
-    }
-  })();
-
+export function obtenerSesion() {
   try {
-    return await renovacionEnCurso;
-  } finally {
-    renovacionEnCurso = null;
+    const sesion = JSON.parse(
+      localStorage.getItem(CLAVE_SESION)
+    );
+
+    // Una sesión antigua sin JWT no es válida
+    if (!sesion || !obtenerToken()) {
+      return null;
+    }
+
+    return sesion;
+
+  } catch (error) {
+    console.error('Error al leer la sesión:', error);
+    return null;
   }
 }
 
@@ -284,11 +290,8 @@ export async function renovarSesion() {
 // ==========================================
 
 export function cerrarSesion() {
-
-  sessionStorage.removeItem(CLAVE_SESION);
-
-  // Eliminar posibles sesiones antiguas
   localStorage.removeItem(CLAVE_SESION);
+  localStorage.removeItem(CLAVE_TOKEN);
 
   window.dispatchEvent(
     new Event(EVENTO_SESION)
@@ -317,61 +320,9 @@ export async function cerrarSesionCompleta() {
 
 
 // ==========================================
-// COMPROBAR AUTENTICACIÓN
+// COMPROBAR SESIÓN
 // ==========================================
 
 export function estaAutenticado() {
-
   return obtenerSesion() !== null;
-}
-
-// ==========================================
-// OBTENER TOKEN JWT
-// ==========================================
-
-export function obtenerToken() {
-
-  const sesion = obtenerSesion();
-
-  return sesion?.token || null;
-}
-
-export async function registrarUsuario(usuario) {
-
-  try {
-
-    // Excluir datos que no debe recibir la API
-    const {
-      rol,
-      tipoUsuario,
-      confirmarPassword,
-      ...datosRegistro
-    } = usuario;
-
-    // Convertir la fecha vacía a null
-    const datosLimpios = {
-      ...datosRegistro,
-      fechaNacimiento:
-        datosRegistro.fechaNacimiento || null
-    };
-
-    // Enviar el registro a Spring Boot
-    const respuesta = await registrarUsuarioAPI(
-      datosLimpios
-    );
-
-    return {
-      exito: true,
-      usuario: respuesta
-    };
-
-  } catch (error) {
-
-    return {
-      exito: false,
-      mensaje:
-        error.message ||
-        'No fue posible registrar al usuario.'
-    };
-  }
 }
