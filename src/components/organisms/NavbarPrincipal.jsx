@@ -1,17 +1,24 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 
 import {
   Navbar,
   Nav,
   Container,
   Button,
-  Badge
+  Badge,
+  Alert
 } from 'react-bootstrap';
 
 import {
   Link,
   useNavigate
 } from 'react-router-dom';
+
+// ==========================================
+// AROMAESENCIAL
+// BARRA DE NAVEGACIÓN PRINCIPAL
+// ==========================================
 
 function NavbarPrincipal({
   usuario,
@@ -23,20 +30,30 @@ function NavbarPrincipal({
   totalItems
 }) {
 
-  const navigate =
-    useNavigate();
+  const navigate = useNavigate();
+
+  // ========================================
+  // ESTADO DEL CIERRE DE SESIÓN
+  // ========================================
+
+  const [cerrandoSesion, setCerrandoSesion] =
+    useState(false);
+
+  const [errorSesion, setErrorSesion] =
+    useState('');
+
+  // ========================================
+  // DATOS DE SESIÓN
+  // ========================================
 
   const haySesion =
-    autenticado ??
-    Boolean(usuario);
+    autenticado ?? Boolean(usuario);
 
   const rolActual =
-    rol ||
-    usuario?.rol;
+    rol || usuario?.rol;
 
   const cantidad =
-    totalItems ??
-    cantidadCarrito;
+    totalItems ?? cantidadCarrito;
 
   const esVendedor =
     rolActual === 'vendedor';
@@ -45,29 +62,70 @@ function NavbarPrincipal({
     rolActual === 'admin';
 
   // ========================================
-  // CERRAR SESIÓN
+  // CERRAR SESIÓN CORRECTAMENTE
   // ========================================
 
-  const manejarCerrarSesion = () => {
+  const manejarCerrarSesion = async () => {
 
-    if (
-      typeof onCerrarSesion ===
-      'function'
-    ) {
-
-      onCerrarSesion();
-
-    } else if (
-      typeof logout ===
-      'function'
-    ) {
-
-      logout();
-
+    // Evitar varios cierres simultáneos.
+    if (cerrandoSesion) {
+      return;
     }
 
-    navigate('/');
+    setErrorSesion('');
+    setCerrandoSesion(true);
+
+    try {
+
+      // Compatibilidad con ambas propiedades.
+      const accionCerrarSesion =
+        typeof onCerrarSesion === 'function'
+          ? onCerrarSesion
+          : logout;
+
+      if (
+        typeof accionCerrarSesion !==
+        'function'
+      ) {
+        throw new Error(
+          'No está configurada la función de cierre de sesión.'
+        );
+      }
+
+      // Esperar a que authService complete
+      // el cierre de sesión.
+      //
+      // Esto permite solicitar al backend
+      // la revocación del refresh token
+      // y limpiar la sesión de React.
+      await accionCerrarSesion();
+
+      // Redirigir cuando termine el proceso.
+      navigate('/', {
+        replace: true
+      });
+
+    } catch (error) {
+
+      console.error(
+        'Error al cerrar sesión:',
+        error
+      );
+
+      setErrorSesion(
+        'No fue posible completar el cierre de sesión.'
+      );
+
+    } finally {
+
+      setCerrandoSesion(false);
+
+    }
   };
+
+  // ========================================
+  // INTERFAZ DE NAVEGACIÓN
+  // ========================================
 
   return (
 
@@ -99,6 +157,10 @@ function NavbarPrincipal({
           />
 
         </Navbar.Brand>
+
+        {/* =================================
+            BOTÓN MENÚ RESPONSIVO
+           ================================= */}
 
         <Navbar.Toggle
           aria-controls="menu-aroma"
@@ -194,12 +256,14 @@ function NavbarPrincipal({
           )}
 
           {/* =================================
-              USUARIO / CARRITO
+              SESIÓN Y CARRITO
              ================================= */}
 
           <Nav className="align-items-lg-center">
 
-            {/* CARRITO SOLO PARA NO VENDEDORES */}
+            {/* =================================
+                CARRITO
+               ================================= */}
 
             {!esVendedor && (
 
@@ -207,6 +271,7 @@ function NavbarPrincipal({
                 as={Link}
                 to="/carrito"
               >
+
                 🛒 Carrito{' '}
 
                 <Badge bg="secondary">
@@ -217,7 +282,9 @@ function NavbarPrincipal({
 
             )}
 
-            {/* SIN SESIÓN */}
+            {/* =================================
+                USUARIO SIN SESIÓN
+               ================================= */}
 
             {!haySesion && (
 
@@ -241,7 +308,9 @@ function NavbarPrincipal({
 
             )}
 
-            {/* CON SESIÓN */}
+            {/* =================================
+                USUARIO AUTENTICADO
+               ================================= */}
 
             {haySesion && (
 
@@ -251,12 +320,13 @@ function NavbarPrincipal({
 
                   Hola,{' '}
 
-                  {usuario?.nombre ||
-                    'Usuario'}
+                  {usuario?.nombre || 'Usuario'}
 
                 </Navbar.Text>
 
-                {/* ADMINISTRADOR */}
+                {/* =========================
+                    ADMINISTRADOR
+                   ========================= */}
 
                 {esAdmin && (
 
@@ -269,7 +339,9 @@ function NavbarPrincipal({
 
                 )}
 
-                {/* VENDEDOR */}
+                {/* =========================
+                    VENDEDOR
+                   ========================= */}
 
                 {esVendedor && (
 
@@ -282,18 +354,41 @@ function NavbarPrincipal({
 
                 )}
 
+                {/* =========================
+                    CERRAR SESIÓN
+                   ========================= */}
+
                 <Button
+                  type="button"
                   variant="outline-secondary"
                   size="sm"
                   className="ms-lg-2 mt-2 mt-lg-0"
-                  onClick={
-                    manejarCerrarSesion
-                  }
+                  onClick={manejarCerrarSesion}
+                  disabled={cerrandoSesion}
                 >
-                  Cerrar sesión
+
+                  {cerrandoSesion
+                    ? 'Cerrando sesión...'
+                    : 'Cerrar sesión'}
+
                 </Button>
 
               </>
+
+            )}
+
+            {/* =================================
+                MENSAJES DE ERROR
+               ================================= */}
+
+            {errorSesion && (
+
+              <Alert
+                variant="danger"
+                className="mb-0 ms-lg-2 mt-2"
+              >
+                {errorSesion}
+              </Alert>
 
             )}
 
@@ -304,7 +399,6 @@ function NavbarPrincipal({
       </Container>
 
     </Navbar>
-
   );
 }
 

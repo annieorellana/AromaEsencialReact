@@ -1,12 +1,7 @@
-import React, {
-  useEffect,
-  useState
-} from 'react';
 
-import {
-  Row,
-  Col
-} from 'react-bootstrap';
+import React, { useEffect, useState } from 'react';
+
+import { Row, Col } from 'react-bootstrap';
 
 import {
   Link,
@@ -32,177 +27,132 @@ import {
   obtenerOrdenPorId
 } from '../../services/orderService';
 
+// ==========================================
+// ADAPTAR RESPUESTA REAL DE SPRING BOOT
+// ==========================================
+
+function adaptarOrden(boleta) {
+
+  if (!boleta) {
+    return null;
+  }
+
+  const detalles = Array.isArray(boleta.detalles)
+    ? boleta.detalles
+    : [];
+
+  return {
+    ...boleta,
+
+    cliente: {
+      nombre: boleta.nombreCliente || '',
+      apellido: '',
+      correo: boleta.correoCliente || '',
+      telefono: boleta.telefono || '',
+      envio: boleta.metodoEnvio || '',
+      direccion: boleta.direccionEnvio || '',
+      region: boleta.region || '',
+      comuna: boleta.comuna || ''
+    },
+
+    productos: detalles.map((detalle) => ({
+      id: detalle.productoId,
+      detalleId: detalle.id,
+      codigo: detalle.codigoProducto,
+      nombre: detalle.nombreProducto,
+      cantidad: detalle.cantidad,
+      precio: detalle.precioUnitario,
+      subtotal: detalle.subtotal
+    }))
+  };
+}
+
+// ==========================================
+// DETALLE DE ORDEN - VENDEDOR
+// ==========================================
+
 function SellerOrdenDetalle() {
 
-  const { id } =
-    useParams();
+  const { id } = useParams();
 
-  const [
-    orden,
-    setOrden
-  ] = useState(null);
+  const [orden, setOrden] = useState(null);
 
-  const [
-    cargando,
-    setCargando
-  ] = useState(true);
+  const [cargando, setCargando] =
+    useState(true);
 
-  const [
-    error,
-    setError
-  ] = useState('');
+  const [error, setError] =
+    useState('');
 
   // ========================================
-  // ADAPTAR RESPUESTA DEL BACKEND
-  // ========================================
-
-  const adaptarOrden = (
-    ordenBackend
-  ) => {
-
-    if (!ordenBackend) {
-      return null;
-    }
-
-    const detalles =
-      Array.isArray(
-        ordenBackend.detalles
-      )
-        ? ordenBackend.detalles
-        : [];
-
-    return {
-      ...ordenBackend,
-
-      // COMPATIBILIDAD CON
-      // COMPONENTES EXISTENTES
-
-      cliente: {
-        nombre:
-          ordenBackend.nombreCliente ||
-          '',
-
-        apellido:
-          '',
-
-        correo:
-          ordenBackend.correoCliente ||
-          '',
-
-        telefono:
-          ordenBackend.telefono ||
-          '',
-
-        envio:
-          ordenBackend.metodoEnvio ||
-          '',
-
-        direccion:
-          ordenBackend.direccionEnvio ||
-          '',
-
-        region:
-          ordenBackend.region ||
-          '',
-
-        comuna:
-          ordenBackend.comuna ||
-          ''
-      },
-
-      productos:
-        detalles.map(
-          (detalle) => ({
-            id:
-              detalle.productoId,
-
-            detalleId:
-              detalle.id,
-
-            codigo:
-              detalle.codigoProducto,
-
-            nombre:
-              detalle.nombreProducto,
-
-            cantidad:
-              detalle.cantidad,
-
-            precio:
-              detalle.precioUnitario,
-
-            subtotal:
-              detalle.subtotal
-          })
-        )
-    };
-  };
-
-  // ========================================
-  // CARGAR ORDEN DESDE BACKEND
-  // ========================================
+  // CONSULTAR BOLETA EN MYSQL
+  // ==========================================
 
   useEffect(() => {
 
     let activo = true;
 
-    const cargarOrden =
-      async () => {
+    const cargarOrden = async () => {
 
-        try {
+      setCargando(true);
+      setError('');
+      setOrden(null);
 
-          setCargando(true);
-          setError('');
+      try {
 
-          const respuesta =
-            await obtenerOrdenPorId(
-              id
-            );
+        const boletaId = Number(id);
 
-          if (!activo) {
-            return;
-          }
-
-          if (!respuesta) {
-
-            setOrden(null);
-
-            setError(
-              'No fue posible encontrar la orden.'
-            );
-
-            return;
-          }
-
-          setOrden(
-            adaptarOrden(
-              respuesta
-            )
+        if (
+          !Number.isSafeInteger(boletaId) ||
+          boletaId <= 0
+        ) {
+          throw new Error(
+            'El número de boleta no es válido.'
           );
-
-        } catch (err) {
-
-          console.error(
-            'Error al cargar la orden:',
-            err
-          );
-
-          if (activo) {
-
-            setError(
-              'No fue posible cargar la orden.'
-            );
-
-          }
-
-        } finally {
-
-          if (activo) {
-            setCargando(false);
-          }
-
         }
-      };
+
+        // orderService utiliza apiFetch,
+        // que incorpora el JWT del vendedor.
+        const respuesta =
+          await obtenerOrdenPorId(boletaId);
+
+        if (!activo) {
+          return;
+        }
+
+        if (!respuesta?.id) {
+          throw new Error(
+            'El servidor no devolvió una boleta válida.'
+          );
+        }
+
+        setOrden(
+          adaptarOrden(respuesta)
+        );
+
+      } catch (err) {
+
+        console.error(
+          'Error al consultar boleta:',
+          err
+        );
+
+        if (activo) {
+
+          setError(
+            err.message ||
+            'No fue posible consultar la boleta.'
+          );
+
+          setOrden(null);
+        }
+
+      } finally {
+
+        if (activo) {
+          setCargando(false);
+        }
+      }
+    };
 
     cargarOrden();
 
@@ -214,115 +164,93 @@ function SellerOrdenDetalle() {
 
   // ========================================
   // CARGANDO
-  // ========================================
+  // ==========================================
 
   if (cargando) {
-
     return (
+      <PlantillaPagina titulo="Detalle de boleta">
 
-      <Alerta variant="info">
-        Cargando orden...
-      </Alerta>
+        <Alerta variant="info">
+          Consultando boleta en MySQL...
+        </Alerta>
 
+      </PlantillaPagina>
     );
-
   }
 
   // ========================================
-  // ORDEN NO ENCONTRADA
-  // ========================================
+  // ERROR O BOLETA NO ENCONTRADA
+  // ==========================================
 
   if (!orden) {
 
     return (
+      <PlantillaPagina titulo="Detalle de boleta">
 
-      <Alerta variant="warning">
-
-        {error ||
-          'Orden no encontrada.'}
-
-        {' '}
+        <Alerta variant="warning">
+          {error || 'Boleta no encontrada.'}
+        </Alerta>
 
         <Link to="/vendedor/ordenes">
           Volver a órdenes
         </Link>
 
-      </Alerta>
-
+      </PlantillaPagina>
     );
-
   }
 
   // ========================================
   // VISTA SOLO LECTURA
-  // ========================================
+  // ==========================================
 
   return (
-    <>
+    <PlantillaPagina
+      titulo={`Boleta N° ${orden.id}`}
+      acciones={
+        <EstadoOrdenBadge
+          estado={orden.estado}
+        />
+      }
+    >
 
       <Link
         to="/vendedor/ordenes"
-        className="small"
+        className="d-inline-block mb-3"
       >
         ← Volver a órdenes
       </Link>
 
-      <div className="mt-3">
+      <Row className="g-3">
 
-        <PlantillaPagina
-          titulo={
-            `Boleta ${orden.id}`
-          }
-          acciones={
-            <EstadoOrdenBadge
-              estado={
-                orden.estado
-              }
-            />
-          }
-        >
+        <Col lg={8}>
 
-          {error && (
+          <BoletaOrden orden={orden} />
 
-            <Alerta variant="danger">
-              {error}
-            </Alerta>
+        </Col>
 
-          )}
+        <Col lg={4}>
 
-          <Row className="g-3">
+          <ResumenPagoOrden orden={orden} />
 
-            <Col lg={8}>
+          <Alerta variant="info">
 
-              <BoletaOrden
-                orden={orden}
-              />
+            <strong>
+              Vista del vendedor
+            </strong>
 
-            </Col>
+            <p className="mb-0 mt-2">
+              Puedes consultar los datos
+              de esta boleta, pero no
+              modificar su estado.
+            </p>
 
-            <Col lg={4}>
+          </Alerta>
 
-              <ResumenPagoOrden
-                orden={orden}
-              />
+        </Col>
 
-              <Alerta
-                variant="info"
-              >
-                Vista de vendedor:
-                esta orden está disponible
-                solo para consulta.
-              </Alerta>
+      </Row>
 
-            </Col>
-
-          </Row>
-
-        </PlantillaPagina>
-
-      </div>
-
-    </>
+    </PlantillaPagina>
   );
 }
 

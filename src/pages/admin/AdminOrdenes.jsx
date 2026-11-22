@@ -1,6 +1,11 @@
-import React, {
-  useState
-} from 'react';
+
+import React, { useState } from 'react';
+
+import {
+  Alert,
+  Button,
+  Spinner
+} from 'react-bootstrap';
 
 import PlantillaPagina
   from '../../components/templates/admin/PlantillaPagina';
@@ -14,153 +19,112 @@ import CampoFormulario
 import TablaOrdenes
   from '../../components/organisms/admin/TablaOrdenes';
 
-import useOrdenes
-  from '../../hooks/useOrdenes';
+import {
+  useOrdenesConEstado
+} from '../../hooks/useOrdenes';
 
 import {
   ESTADOS_ORDEN
 } from '../../utils/adminFormato';
 
+// ==========================================
+// NORMALIZAR ESTADOS
+// ==========================================
+
+function normalizarEstado(valor) {
+  return String(valor || '')
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/\s+/g, '_');
+}
+
+// ==========================================
+// ÓRDENES DEL ADMINISTRADOR
+// ==========================================
+
 function AdminOrdenes() {
-  // ========================================
-  // ÓRDENES DESDE EL BACKEND
-  // ========================================
 
-  const ordenes = useOrdenes();
+  const {
+    ordenes,
+    cargando,
+    error,
+    reintentar
+  } = useOrdenesConEstado();
 
-  // ========================================
-  // FILTROS
-  // ========================================
-
-  const [
-    busqueda,
-    setBusqueda
-  ] = useState('');
-
-  const [
-    estado,
-    setEstado
-  ] = useState('');
+  const [busqueda, setBusqueda] = useState('');
+  const [estado, setEstado] = useState('');
 
   // ========================================
-  // NORMALIZAR ESTADOS
+  // ADAPTAR RESPUESTA DEL BACKEND
   // ========================================
 
-  const normalizarEstado = (valor) =>
-    String(valor || '')
-      .trim()
-      .toUpperCase()
-      .replace(/\s+/g, '_');
-
-  // ========================================
-  // ADAPTAR BOLETAS DEL BACKEND
-  // ========================================
-  //
-  // El backend devuelve:
-  //
-  // nombreCliente
-  // correoCliente
-  // detalles
-  //
-  // Algunas piezas antiguas del frontend
-  // todavía pueden esperar:
-  //
-  // cliente.nombre
-  // cliente.correo
-  // productos
-  //
-  // Esta adaptación mantiene compatibilidad
-  // mientras conectamos todo el módulo.
-  // ========================================
-
-  const ordenesAdaptadas =
-    ordenes.map((orden) => ({
+  const ordenesAdaptadas = ordenes.map(
+    (orden) => ({
       ...orden,
 
-      cliente:
-        orden.cliente || {
-          nombre:
-            orden.nombreCliente || '',
-
-          apellido:
-            '',
-
-          correo:
-            orden.correoCliente || ''
-        },
+      cliente: orden.cliente || {
+        nombre: orden.nombreCliente || '',
+        apellido: '',
+        correo: orden.correoCliente || ''
+      },
 
       productos:
         orden.productos ||
         orden.detalles ||
         []
-    }));
+    })
+  );
 
   // ========================================
   // ORDENAR Y FILTRAR
   // ========================================
 
-  const visibles = [
-    ...ordenesAdaptadas
-  ]
-    .sort(
-      (a, b) =>
-        String(
-          b.fecha || ''
-        ).localeCompare(
-          String(
-            a.fecha || ''
-          )
-        )
+  const visibles = [...ordenesAdaptadas]
+    .sort((a, b) =>
+      String(b.fecha || '').localeCompare(
+        String(a.fecha || '')
+      )
     )
     .filter((orden) => {
-      // FILTRO POR ESTADO
+
       const coincideEstado =
         !estado ||
-        normalizarEstado(
-          orden.estado
-        ) ===
-        normalizarEstado(
-          estado
-        );
+        normalizarEstado(orden.estado) ===
+          normalizarEstado(estado);
 
-      // FILTRO POR BÚSQUEDA
-      const textoBusqueda = `
-        ${orden.id || ''}
-        ${orden.nombreCliente || ''}
-        ${orden.correoCliente || ''}
-        ${orden.cliente?.nombre || ''}
-        ${orden.cliente?.apellido || ''}
-        ${orden.cliente?.correo || ''}
-      `
+      const texto = [
+        orden.id,
+        orden.nombreCliente,
+        orden.correoCliente,
+        orden.cliente?.nombre,
+        orden.cliente?.apellido,
+        orden.cliente?.correo
+      ]
+        .filter(Boolean)
+        .join(' ')
         .toLowerCase();
-
-      const coincideBusqueda =
-        textoBusqueda.includes(
-          busqueda
-            .trim()
-            .toLowerCase()
-        );
 
       return (
         coincideEstado &&
-        coincideBusqueda
+        texto.includes(
+          busqueda.trim().toLowerCase()
+        )
       );
     });
 
   // ========================================
-  // VISTA
+  // INTERFAZ
   // ========================================
 
   return (
-    <PlantillaPagina
-      titulo="Órdenes"
-    >
+
+    <PlantillaPagina titulo="Órdenes">
 
       <BarraFiltros
         busqueda={busqueda}
-        onBusqueda={
-          setBusqueda
-        }
+        onBusqueda={setBusqueda}
         placeholder="Buscar por N° de orden o cliente"
         etiqueta="Buscar órdenes"
       >
@@ -169,27 +133,62 @@ function AdminOrdenes() {
           id="filtro-estado"
           etiqueta=""
           tipo="select"
-          aria-label="Filtrar por estado"
-          opciones={
-            ESTADOS_ORDEN
-          }
+          opciones={ESTADOS_ORDEN}
           placeholder="Todos los estados"
           valor={estado}
-          onCambio={
-            (e) =>
-              setEstado(
-                e.target.value
-              )
+          onCambio={(evento) =>
+            setEstado(evento.target.value)
           }
         />
 
       </BarraFiltros>
 
-      <TablaOrdenes
-        ordenes={
-          visibles
-        }
-      />
+      {/* CARGANDO */}
+
+      {cargando && (
+        <Alert variant="info">
+          <Spinner
+            animation="border"
+            size="sm"
+            className="me-2"
+          />
+          Consultando órdenes en MySQL...
+        </Alert>
+      )}
+
+      {/* ERROR REAL DE LA API */}
+
+      {!cargando && error && (
+        <Alert variant="danger">
+
+          <strong>
+            No fue posible cargar las órdenes.
+          </strong>
+
+          <div className="mt-2">
+            {error}
+          </div>
+
+          <Button
+            type="button"
+            variant="outline-danger"
+            size="sm"
+            className="mt-3"
+            onClick={reintentar}
+          >
+            Reintentar consulta
+          </Button>
+
+        </Alert>
+      )}
+
+      {/* RESULTADOS */}
+
+      {!cargando && !error && (
+        <TablaOrdenes
+          ordenes={visibles}
+        />
+      )}
 
     </PlantillaPagina>
   );

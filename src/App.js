@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 // ESTILOS CORPORATIVOS AROMAESENCIAL
@@ -78,7 +79,10 @@ import useCart
 
 function App() {
 
-  // OBTENER FUNCIONES DEL CARRITO
+  // ========================================
+  // FUNCIONES DEL CARRITO
+  // ========================================
+
   const {
     carrito,
     agregarAlCarrito,
@@ -89,40 +93,40 @@ function App() {
   } = useCart();
 
   // ========================================
-  // FINALIZAR COMPRA
+  // FINALIZAR COMPRA CON SPRING BOOT
   // ========================================
 
-  const finalizarCompra =
-    async (orden) => {
+  const finalizarCompra = async (orden) => {
 
-      try {
+    // Crear la boleta mediante orderService.js.
+    // El backend realiza los cálculos definitivos,
+    // valida el stock y registra la compra en MySQL.
 
-        const nuevaOrden =
-          await crearOrden(
-            orden
-          );
+    const nuevaOrden = await crearOrden(orden);
 
-        // SI EL BACKEND NO CREA LA ORDEN
-        if (!nuevaOrden) {
-          return null;
-        }
+    // Verificar que Spring Boot confirmó
+    // la creación de una boleta real.
 
-        // LIMPIAR CARRITO SOLO DESPUÉS
-        // DE CREAR CORRECTAMENTE LA BOLETA
-        limpiarCarrito();
+    if (!nuevaOrden?.id) {
+      throw new Error(
+        'No fue posible registrar la compra en el servidor.'
+      );
+    }
 
-        return nuevaOrden;
+    // Vaciar el carrito solamente después
+    // de recibir la boleta creada correctamente.
 
-      } catch (error) {
+    limpiarCarrito();
 
-        console.error(
-          'Error al finalizar la compra:',
-          error
-        );
+    // Devolver los datos reales de la boleta
+    // para mostrarlos en CompraExitosa.
 
-        return null;
-      }
-    };
+    return nuevaOrden;
+  };
+
+  // ========================================
+  // RUTAS DE LA APLICACION
+  // ========================================
 
   return (
 
@@ -288,7 +292,7 @@ function App() {
         />
 
         {/* =================================
-            RESULTADO DE LA COMPRA
+            RESULTADOS DE LA COMPRA
            ================================= */}
 
         <Route
@@ -306,7 +310,7 @@ function App() {
         />
 
         {/* =================================
-            INICIO DE SESION
+            AUTENTICACION
            ================================= */}
 
         <Route
@@ -315,10 +319,6 @@ function App() {
             <Login />
           }
         />
-
-        {/* =================================
-            REGISTRO DE USUARIOS
-           ================================= */}
 
         <Route
           path="/registro"

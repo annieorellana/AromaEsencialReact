@@ -1,187 +1,348 @@
+
 import React, {
   useEffect,
+  useRef,
   useState
 } from 'react';
 
 import {
-  Card
+  Card,
+  Form,
+  Button,
+  Alert
 } from 'react-bootstrap';
 
-import Button
-  from '../../atoms/Button';
+// ==========================================
+// AROMAESENCIAL
+// FORMULARIO DE ESTADO DE ÓRDENES
+// ==========================================
 
-import Alerta
-  from '../../atoms/Alerta';
+// Estados definidos en EstadoBoleta.java.
+const ETIQUETAS = {
+  CONFIRMADA: 'Confirmada',
+  EN_PREPARACION: 'En preparación',
+  ENVIADA: 'Enviada',
+  ENTREGADA: 'Entregada',
+  CANCELADA: 'Cancelada'
+};
 
-import CampoFormulario
-  from '../../molecules/admin/CampoFormulario';
+// ==========================================
+// TRANSICIONES PERMITIDAS POR SPRING BOOT
+// ==========================================
 
-import {
-  ESTADOS_ORDEN
-} from '../../../utils/adminFormato';
+const TRANSICIONES = {
+  CONFIRMADA: [
+    'EN_PREPARACION',
+    'CANCELADA'
+  ],
+
+  EN_PREPARACION: [
+    'ENVIADA',
+    'CANCELADA'
+  ],
+
+  ENVIADA: [
+    'ENTREGADA',
+    'CANCELADA'
+  ],
+
+  ENTREGADA: [],
+  CANCELADA: []
+};
+
+// ==========================================
+// NORMALIZAR ESTADO
+// ==========================================
+
+function normalizarEstado(valor) {
+
+  return String(valor || '')
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/\s+/g, '_');
+}
+
+// ==========================================
+// COMPONENTE
+// ==========================================
 
 function FormularioEstadoOrden({
   estadoActual,
   onGuardar,
   disabled = false
 }) {
-  const [
-    nuevo,
-    setNuevo
-  ] = useState('');
 
-  const [
-    aviso,
-    setAviso
-  ] = useState('');
+  const [nuevoEstado, setNuevoEstado] =
+    useState('');
 
-  const [
-    error,
-    setError
-  ] = useState('');
+  const [guardando, setGuardando] =
+    useState(false);
+
+  const [error, setError] =
+    useState('');
+
+  const guardadoEnCurso = useRef(false);
 
   // ========================================
-  // OPCIONES DE ESTADO
+  // ESTADO ACTUAL REAL
   // ========================================
 
-  const opciones =
-    ESTADOS_ORDEN.includes(
-      estadoActual
-    )
-      ? ESTADOS_ORDEN
-      : [
-          estadoActual,
-          ...ESTADOS_ORDEN
-        ];
+  const estadoNormalizado =
+    normalizarEstado(estadoActual);
+
+  const etiquetaActual =
+    ETIQUETAS[estadoNormalizado] ||
+    estadoActual ||
+    'Desconocido';
 
   // ========================================
-  // SINCRONIZAR SI CAMBIA LA ORDEN
+  // OPCIONES PERMITIDAS
+  // ========================================
+
+  const opcionesPermitidas =
+    TRANSICIONES[estadoNormalizado] || [];
+
+  const estadoFinal =
+    estadoNormalizado === 'ENTREGADA' ||
+    estadoNormalizado === 'CANCELADA';
+
+  // ========================================
+  // SINCRONIZAR CUANDO CAMBIA LA BOLETA
   // ========================================
 
   useEffect(() => {
-    setNuevo('');
-    setAviso('');
+
+    setNuevoEstado('');
     setError('');
-  }, [estadoActual]);
+
+  }, [estadoNormalizado]);
 
   // ========================================
-  // GUARDAR NUEVO ESTADO
+  // GUARDAR ESTADO
   // ========================================
 
-  const guardar = async () => {
+  const guardar = async (evento) => {
+
+    evento.preventDefault();
+
     if (
       disabled ||
-      !nuevo ||
-      nuevo === estadoActual
+      guardadoEnCurso.current ||
+      !nuevoEstado
     ) {
       return;
     }
 
-    setAviso('');
+    // Validar que el backend permita
+    // la transición seleccionada.
+    if (
+      !opcionesPermitidas.includes(nuevoEstado)
+    ) {
+      setError(
+        'El cambio de estado seleccionado no está permitido.'
+      );
+      return;
+    }
+
+    if (typeof onGuardar !== 'function') {
+      setError(
+        'No está configurada la actualización de estados.'
+      );
+      return;
+    }
+
+    guardadoEnCurso.current = true;
+
+    setGuardando(true);
     setError('');
 
     try {
-      const actualizado =
-        await onGuardar(
-          nuevo
-        );
 
-      // EL BACKEND RECHAZÓ EL CAMBIO
-      if (!actualizado) {
-        setError(
-          'No fue posible actualizar el estado.'
-        );
+      // AdminOrdenDetalle.jsx realiza
+      // la petición autenticada a Spring Boot.
+      const resultado = await onGuardar(
+        nuevoEstado
+      );
 
+      // AdminOrdenDetalle muestra los errores
+      // del backend. Evitamos duplicar mensajes.
+      if (!resultado) {
         return;
       }
 
-      setAviso(
-        `Estado actualizado a "${nuevo}".`
-      );
-
-      setNuevo('');
+      // El estado definitivo se obtiene
+      // mediante la respuesta del backend.
+      setNuevoEstado('');
 
     } catch (err) {
+
       console.error(
         'Error al actualizar estado:',
         err
       );
 
       setError(
+        err.message ||
         'No fue posible actualizar el estado.'
       );
+
+    } finally {
+
+      guardadoEnCurso.current = false;
+      setGuardando(false);
+
     }
   };
 
   // ========================================
-  // VISTA
+  // INTERFAZ
   // ========================================
 
   return (
-    <Card body>
 
-      <CampoFormulario
-        id="estado"
-        etiqueta="Actualizar estado"
-        tipo="select"
-        opciones={
-          opciones
-        }
-        valor={
-          nuevo ||
-          estadoActual
-        }
-        onCambio={
-          (e) => {
-            setNuevo(
-              e.target.value
-            );
+    <Card body className="mb-3">
 
-            setAviso('');
-            setError('');
-          }
-        }
-        disabled={
-          disabled
-        }
-      />
+      <h5 className="mb-3">
+        Administrar estado
+      </h5>
 
-      <Button
-        disabled={
-          disabled ||
-          !nuevo ||
-          nuevo === estadoActual
-        }
-        onClick={
-          guardar
-        }
-      >
-        {disabled
-          ? 'Actualizando...'
-          : 'Guardar estado'}
-      </Button>
+      {/* =================================
+          ESTADO ACTUAL
+         ================================= */}
 
-      {aviso && (
-        <Alerta
-          variant="success"
-          className="mt-3 mb-0 py-2"
-          role="status"
+      <p className="mb-3">
+
+        <strong>
+          Estado actual:
+        </strong>{' '}
+
+        {etiquetaActual}
+
+      </p>
+
+      {/* =================================
+          ESTADO FINAL
+         ================================= */}
+
+      {estadoFinal ? (
+
+        <Alert
+          variant="secondary"
+          className="mb-0"
         >
-          {aviso}
-        </Alerta>
-      )}
 
-      {error && (
-        <Alerta
-          variant="danger"
-          className="mt-3 mb-0 py-2"
-          role="alert"
-        >
-          {error}
-        </Alerta>
+          Esta boleta tiene un estado final.
+
+          No se permiten nuevas modificaciones.
+
+        </Alert>
+
+      ) : (
+
+        <Form onSubmit={guardar}>
+
+          {/* =========================
+              SELECCIONAR ESTADO
+             ========================= */}
+
+          <Form.Group
+            className="mb-3"
+            controlId="nuevo-estado-orden"
+          >
+
+            <Form.Label>
+              Cambiar a:
+            </Form.Label>
+
+            <Form.Select
+
+              value={nuevoEstado}
+
+              onChange={(evento) => {
+
+                setNuevoEstado(
+                  evento.target.value
+                );
+
+                setError('');
+
+              }}
+
+              disabled={
+                disabled || guardando
+              }
+
+              required
+            >
+
+              <option value="">
+                Selecciona un nuevo estado
+              </option>
+
+              {opcionesPermitidas.map(
+                (estado) => (
+
+                  <option
+                    key={estado}
+                    value={estado}
+                  >
+
+                    {ETIQUETAS[estado]}
+
+                  </option>
+
+                )
+              )}
+
+            </Form.Select>
+
+          </Form.Group>
+
+          {/* =========================
+              MENSAJE DE ERROR
+             ========================= */}
+
+          {error && (
+
+            <Alert variant="danger">
+              {error}
+            </Alert>
+
+          )}
+
+          {/* =========================
+              GUARDAR CAMBIO
+             ========================= */}
+
+          <Button
+
+            type="submit"
+
+            variant="dark"
+
+            className="w-100"
+
+            disabled={
+              disabled ||
+              guardando ||
+              !nuevoEstado
+            }
+          >
+
+            {disabled || guardando
+              ? 'Actualizando estado...'
+              : 'Guardar estado'}
+
+          </Button>
+
+        </Form>
+
       )}
 
     </Card>
+
   );
 }
 

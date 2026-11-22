@@ -1,171 +1,396 @@
 
-import { obtenerToken } from './authService';
-
-const API_BASE_URL = 'http://localhost:8080/api/v1';
+import { apiFetch } from './apiFetch';
 
 // ==========================================
-// FUNCIÓN GENERAL PARA PETICIONES HTTP
+// AROMAESENCIAL
+// SERVICIO API DE PRODUCTOS Y CATEGORÍAS
 // ==========================================
 
-async function solicitar(ruta, opciones = {}) {
+const API_BASE_URL = (
+  process.env.REACT_APP_API_URL ||
+  'http://localhost:8080/api/v1'
+).replace(/\/+$/, '');
 
-  // Obtener token JWT de la sesión actual
-  const token = obtenerToken();
+// ==========================================
+// MANEJO DE ERRORES
+// ==========================================
 
-  // Preparar encabezados
-  const headers = {
-    'Content-Type': 'application/json',
-    ...opciones.headers
-  };
+async function obtenerMensajeError(respuesta) {
 
-  // Agregar autorización cuando exista token
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  let mensaje = `Error HTTP ${respuesta.status}`;
+
+  try {
+
+    const texto = await respuesta.text();
+
+    if (texto) {
+
+      try {
+
+        const datos = JSON.parse(texto);
+
+        if (typeof datos === 'string') {
+          mensaje = datos;
+        } else {
+
+          mensaje =
+            datos?.mensaje ||
+            datos?.message ||
+            datos?.detail ||
+            datos?.error ||
+            mensaje;
+
+          // Incluir errores de validación
+          // si el backend los proporciona.
+          if (
+            Array.isArray(datos?.detalles) &&
+            datos.detalles.length > 0
+          ) {
+            mensaje +=
+              ': ' + datos.detalles.join('; ');
+          }
+        }
+
+      } catch {
+        // Respuesta de texto no JSON.
+        mensaje = texto;
+      }
+    }
+
+  } catch {
+    // Conservar el mensaje HTTP original.
   }
 
-  // Realizar petición al backend
-  const respuesta = await fetch(
-    `${API_BASE_URL}${ruta}`,
-    {
-      ...opciones,
-      headers
-    }
+  if (respuesta.status === 401) {
+    return 'Tu sesión ha vencido. Inicia sesión nuevamente.';
+  }
+
+  if (respuesta.status === 403) {
+    return 'No tienes permisos para realizar esta operación.';
+  }
+
+  return mensaje;
+}
+
+// ==========================================
+// FUNCIÓN GENERAL DE PETICIONES HTTP
+// ==========================================
+
+async function solicitar(
+  ruta,
+  opciones = {},
+  requiereAutenticacion = false
+) {
+
+  const url = `${API_BASE_URL}${ruta}`;
+
+  const headers = new Headers(
+    opciones.headers || {}
   );
 
-  // ==========================================
-  // MANEJO DE ERRORES
-  // ==========================================
+  headers.set(
+    'Accept',
+    'application/json'
+  );
+
+  // Agregar Content-Type solo cuando
+  // se envía un cuerpo JSON.
+  if (
+    opciones.body !== undefined &&
+    opciones.body !== null &&
+    !(opciones.body instanceof FormData) &&
+    !headers.has('Content-Type')
+  ) {
+    headers.set(
+      'Content-Type',
+      'application/json'
+    );
+  }
+
+  const configuracion = {
+    ...opciones,
+    headers
+  };
+
+  let respuesta;
+
+  try {
+
+    if (requiereAutenticacion) {
+
+      // apiFetch agrega el JWT.
+      // También permite renovar la sesión
+      // si el token de acceso ha vencido.
+      respuesta = await apiFetch(
+        url,
+        configuracion
+      );
+
+    } else {
+
+      // Productos y categorías públicos:
+      // no necesitan iniciar sesión.
+      respuesta = await fetch(
+        url,
+        configuracion
+      );
+    }
+
+  } catch (error) {
+
+    console.error(
+      'Error de conexión con la API:',
+      error
+    );
+
+    throw error;
+  }
+
+  // ========================================
+  // VALIDAR RESPUESTA
+  // ========================================
 
   if (!respuesta.ok) {
 
-    let mensaje = `Error HTTP ${respuesta.status}`;
-
-    try {
-
-      const datos = await respuesta.json();
-
-      mensaje =
-        datos.mensaje ||
-        datos.message ||
-        mensaje;
-
-    } catch {
-      // La respuesta no contiene JSON.
-    }
+    const mensaje =
+      await obtenerMensajeError(respuesta);
 
     const error = new Error(mensaje);
+
     error.status = respuesta.status;
 
     throw error;
   }
 
-  // Respuestas sin contenido
+  // ========================================
+  // RESPUESTAS SIN CONTENIDO
+  // ========================================
+
   if (respuesta.status === 204) {
     return null;
   }
 
-  // Convertir respuesta a JSON
+  // ========================================
+  // CONVERTIR RESPUESTA A JSON
+  // ========================================
+
   const texto = await respuesta.text();
 
-  return texto ? JSON.parse(texto) : null;
+  if (!texto) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(texto);
+
+  } catch {
+    throw new Error(
+      'El servidor devolvió una respuesta JSON inválida.'
+    );
+  }
 }
 
 // ==========================================
 // PRODUCTOS
 // ==========================================
 
-// Listar todos los productos
-export function listarProductos() {
-  return solicitar('/productos');
-}
+// ==========================================
+// GET - LISTAR PRODUCTOS
+// Endpoint público
+// ==========================================
 
-// Buscar producto por ID
-export function buscarProducto(id) {
+export function listarProductos() {
+
   return solicitar(
-    `/productos/${encodeURIComponent(id)}`
+    '/productos',
+    {
+      method: 'GET'
+    }
   );
 }
 
-// Crear producto
-export function crearProductoApi(producto) {
-  return solicitar('/productos', {
-    method: 'POST',
-    body: JSON.stringify(producto)
-  });
+// ==========================================
+// GET - BUSCAR PRODUCTO POR ID
+// Endpoint público
+// ==========================================
+
+export function buscarProducto(id) {
+
+  return solicitar(
+    `/productos/${encodeURIComponent(id)}`,
+    {
+      method: 'GET'
+    }
+  );
 }
 
-// Actualizar producto
-export function actualizarProductoApi(id, producto) {
+// ==========================================
+// POST - CREAR PRODUCTO
+// Solo ADMINISTRADOR
+// ==========================================
+
+export function crearProductoApi(producto) {
+
+  return solicitar(
+    '/productos',
+    {
+      method: 'POST',
+      body: JSON.stringify(producto)
+    },
+    true
+  );
+}
+
+// ==========================================
+// PUT - ACTUALIZAR PRODUCTO
+// Solo ADMINISTRADOR
+// ==========================================
+
+export function actualizarProductoApi(
+  id,
+  producto
+) {
+
   return solicitar(
     `/productos/${encodeURIComponent(id)}`,
     {
       method: 'PUT',
       body: JSON.stringify(producto)
-    }
+    },
+    true
   );
 }
 
-// Eliminar producto
+// ==========================================
+// DELETE - ELIMINAR PRODUCTO
+// Solo ADMINISTRADOR
+// ==========================================
+
 export function eliminarProductoApi(id) {
+
   return solicitar(
     `/productos/${encodeURIComponent(id)}`,
     {
       method: 'DELETE'
-    }
+    },
+    true
   );
 }
 
-// Listar productos con stock crítico
+// ==========================================
+// GET - PRODUCTOS CON STOCK CRÍTICO
+// Solo ADMINISTRADOR
+// ==========================================
+
 export function listarStockCritico() {
-  return solicitar('/productos/stock-critico');
+
+  return solicitar(
+    '/productos/stock-critico',
+    {
+      method: 'GET'
+    },
+    true
+  );
 }
 
-// Listar productos en oferta
+// ==========================================
+// GET - PRODUCTOS EN OFERTA
+// Endpoint público
+// ==========================================
+
 export function listarOfertas() {
-  return solicitar('/productos/ofertas');
+
+  return solicitar(
+    '/productos/ofertas',
+    {
+      method: 'GET'
+    }
+  );
 }
 
 // ==========================================
 // CATEGORÍAS
 // ==========================================
 
-// Listar categorías
-export function listarCategorias() {
-  return solicitar('/categorias');
-}
+// ==========================================
+// GET - LISTAR CATEGORÍAS
+// Endpoint público
+// ==========================================
 
-// Buscar categoría por ID
-export function buscarCategoria(id) {
+export function listarCategorias() {
+
   return solicitar(
-    `/categorias/${encodeURIComponent(id)}`
+    '/categorias',
+    {
+      method: 'GET'
+    }
   );
 }
 
-// Crear categoría
-export function crearCategoriaApi(categoria) {
-  return solicitar('/categorias', {
-    method: 'POST',
-    body: JSON.stringify(categoria)
-  });
+// ==========================================
+// GET - BUSCAR CATEGORÍA POR ID
+// Endpoint público
+// ==========================================
+
+export function buscarCategoria(id) {
+
+  return solicitar(
+    `/categorias/${encodeURIComponent(id)}`,
+    {
+      method: 'GET'
+    }
+  );
 }
 
-// Actualizar categoría
-export function actualizarCategoriaApi(id, categoria) {
+// ==========================================
+// POST - CREAR CATEGORÍA
+// Solo ADMINISTRADOR
+// ==========================================
+
+export function crearCategoriaApi(categoria) {
+
+  return solicitar(
+    '/categorias',
+    {
+      method: 'POST',
+      body: JSON.stringify(categoria)
+    },
+    true
+  );
+}
+
+// ==========================================
+// PUT - ACTUALIZAR CATEGORÍA
+// Solo ADMINISTRADOR
+// ==========================================
+
+export function actualizarCategoriaApi(
+  id,
+  categoria
+) {
+
   return solicitar(
     `/categorias/${encodeURIComponent(id)}`,
     {
       method: 'PUT',
       body: JSON.stringify(categoria)
-    }
+    },
+    true
   );
 }
 
-// Eliminar categoría
+// ==========================================
+// DELETE - ELIMINAR CATEGORÍA
+// Solo ADMINISTRADOR
+// ==========================================
+
 export function eliminarCategoriaApi(id) {
+
   return solicitar(
     `/categorias/${encodeURIComponent(id)}`,
     {
       method: 'DELETE'
-    }
+    },
+    true
   );
 }

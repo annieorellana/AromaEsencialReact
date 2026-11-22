@@ -1,92 +1,229 @@
-import { useEffect, useState } from 'react';
+
+import {
+  useCallback,
+  useEffect,
+  useState
+} from 'react';
 
 import {
   obtenerSesion,
   renovarSesion,
   cerrarSesionCompleta,
+  normalizarRol,
   EVENTO_SESION
 } from '../services/authService';
 
+// ==========================================
+// AROMAESENCIAL
+// HOOK DE AUTENTICACIÓN
+// ==========================================
+
 function useAuth() {
 
+  // ========================================
+  // ESTADO INICIAL DEL USUARIO
+  // ========================================
+
   const [usuario, setUsuario] = useState(
-    obtenerSesion
+    () => obtenerSesion()
   );
 
-  const [verificandoSesion, setVerificandoSesion] =
-    useState(true);
+  const [
+    verificandoSesion,
+    setVerificandoSesion
+  ] = useState(true);
+
+  // ========================================
+  // SINCRONIZAR SESIÓN
+  // ========================================
+
+  const actualizarSesion = useCallback(() => {
+
+    const sesionActual = obtenerSesion();
+
+    setUsuario(
+      sesionActual || null
+    );
+
+    return sesionActual;
+
+  }, []);
+
+  // ========================================
+  // COMPROBAR Y RECUPERAR SESIÓN
+  // ========================================
 
   useEffect(() => {
 
-    let activo = true;
+    let componenteActivo = true;
 
-    async function comprobarSesion() {
+    // ======================================
+    // VERIFICACIÓN INICIAL
+    // ======================================
 
-      const sesionActual = obtenerSesion();
+    const comprobarSesion = async () => {
 
-      if (sesionActual) {
-        if (activo) {
-          setUsuario(sesionActual);
+      try {
+
+        // Primero revisar si existe
+        // una sesión con JWT vigente.
+        let sesion = obtenerSesion();
+
+        if (!sesion) {
+
+          // Si no existe un JWT vigente,
+          // intentar recuperar la sesión
+          // mediante la cookie HttpOnly.
+          sesion = await renovarSesion();
+
+        }
+
+        if (!componenteActivo) {
+          return;
+        }
+
+        // Volver a consultar el estado actual.
+        // Evita restaurar datos antiguos si
+        // el usuario inició o cerró sesión
+        // mientras se renovaba el JWT.
+        const sesionActual =
+          obtenerSesion();
+
+        setUsuario(
+          sesionActual || sesion || null
+        );
+
+      } catch (error) {
+
+        console.warn(
+          'No fue posible verificar la sesión:',
+          error
+        );
+
+        if (componenteActivo) {
+
+          setUsuario(
+            obtenerSesion() || null
+          );
+
+        }
+
+      } finally {
+
+        if (componenteActivo) {
           setVerificandoSesion(false);
         }
-        return;
-      }
 
-      // Si el JWT venció, intentar renovarlo
-      // utilizando la cookie HttpOnly.
-      const sesionRenovada = await renovarSesion();
-
-      if (activo) {
-        setUsuario(sesionRenovada);
-        setVerificandoSesion(false);
-      }
-    }
-
-    const actualizarSesion = () => {
-      if (activo) {
-        setUsuario(obtenerSesion());
       }
     };
 
+    // ======================================
+    // EVENTOS DE AUTENTICACIÓN
+    // ======================================
+
+    const manejarCambioSesion = () => {
+
+      if (!componenteActivo) {
+        return;
+      }
+
+      actualizarSesion();
+
+      setVerificandoSesion(false);
+    };
+
+    // Login, renovación o logout.
     window.addEventListener(
       EVENTO_SESION,
-      actualizarSesion
+      manejarCambioSesion
     );
 
+    // Detectar cambios de almacenamiento
+    // originados por otra pestaña.
     window.addEventListener(
       'storage',
-      actualizarSesion
+      manejarCambioSesion
     );
 
+    // Ejecutar verificación al montar.
     comprobarSesion();
 
+    // ======================================
+    // LIMPIAR EVENTOS
+    // ======================================
+
     return () => {
-      activo = false;
+
+      componenteActivo = false;
 
       window.removeEventListener(
         EVENTO_SESION,
-        actualizarSesion
+        manejarCambioSesion
       );
 
       window.removeEventListener(
         'storage',
-        actualizarSesion
+        manejarCambioSesion
       );
     };
 
+  }, [actualizarSesion]);
+
+  // ========================================
+  // CERRAR SESIÓN
+  // ========================================
+
+  const logout = useCallback(async () => {
+
+    try {
+
+      // Revocar el refresh token en
+      // Spring Boot y limpiar la sesión.
+      await cerrarSesionCompleta();
+
+    } catch (error) {
+
+      console.error(
+        'Error al cerrar sesión:',
+        error
+      );
+
+    } finally {
+
+      // Asegurar que React actualice
+      // los componentes que utilizan
+      // este hook.
+      setUsuario(null);
+
+      setVerificandoSesion(false);
+    }
+
   }, []);
 
-  const logout = async () => {
-    await cerrarSesionCompleta();
-    setUsuario(null);
-};
+  // ========================================
+  // DATOS DE AUTENTICACIÓN
+  // ========================================
+
+  const autenticado =
+    usuario !== null &&
+    Boolean(usuario?.id);
+
+  const rol =
+    autenticado
+      ? normalizarRol(usuario.rol)
+      : null;
+
+  // ========================================
+  // RESULTADO DEL HOOK
+  // ========================================
 
   return {
     usuario,
-    autenticado: usuario !== null,
-    rol: usuario?.rol || null,
+    autenticado,
+    rol,
     verificandoSesion,
-    logout
+    logout,
+    actualizarSesion
   };
 }
 

@@ -1,6 +1,11 @@
-import React, {
-  useState
-} from 'react';
+
+import React, { useState } from 'react';
+
+import {
+  Alert,
+  Button,
+  Spinner
+} from 'react-bootstrap';
 
 import PlantillaPagina
   from '../../components/templates/admin/PlantillaPagina';
@@ -14,78 +19,91 @@ import CampoFormulario
 import TablaOrdenesSeller
   from '../../components/organisms/seller/TablaOrdenesSeller';
 
-import useOrdenes
-  from '../../hooks/useOrdenes';
+import {
+  useOrdenesConEstado
+} from '../../hooks/useOrdenes';
 
 import {
   ESTADOS_ORDEN
 } from '../../utils/adminFormato';
 
+// ==========================================
+// NORMALIZAR ESTADO
+// ==========================================
+
+function normalizarEstado(valor) {
+  return String(valor || '')
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/\s+/g, '_');
+}
+
+// ==========================================
+// ÓRDENES DEL VENDEDOR
+// SOLO CONSULTA
+// ==========================================
+
 function SellerOrdenes() {
-  const ordenes =
-    useOrdenes();
 
-  const [
-    busqueda,
-    setBusqueda
-  ] = useState('');
+  const {
+    ordenes,
+    cargando,
+    error,
+    reintentar
+  } = useOrdenesConEstado();
 
-  const [
-    estado,
-    setEstado
-  ] = useState('');
+  const [busqueda, setBusqueda] = useState('');
+  const [estado, setEstado] = useState('');
 
-  const visibles = [
-    ...ordenes
-  ]
-    .sort(
-      (a, b) =>
-        String(
-          b.fecha || ''
-        ).localeCompare(
-          String(
-            a.fecha || ''
-          )
-        )
+  // ========================================
+  // ORDENAR Y FILTRAR
+  // ========================================
+
+  const visibles = [...ordenes]
+    .sort((a, b) =>
+      String(b.fecha || '').localeCompare(
+        String(a.fecha || '')
+      )
     )
-    .filter(
-      (orden) => {
+    .filter((orden) => {
 
-        const coincideEstado =
-          !estado ||
-          orden.estado === estado;
+      const coincideEstado =
+        !estado ||
+        normalizarEstado(orden.estado) ===
+          normalizarEstado(estado);
 
-        const texto = `
-          ${orden.id || ''}
-          ${orden.nombreCliente || ''}
-          ${orden.correoCliente || ''}
-        `
-          .toLowerCase();
+      const texto = [
+        orden.id,
+        orden.nombreCliente,
+        orden.correoCliente,
+        orden.cliente?.nombre,
+        orden.cliente?.correo
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
 
-        const coincideBusqueda =
-          texto.includes(
-            busqueda
-              .trim()
-              .toLowerCase()
-          );
+      return (
+        coincideEstado &&
+        texto.includes(
+          busqueda.trim().toLowerCase()
+        )
+      );
+    });
 
-        return (
-          coincideEstado &&
-          coincideBusqueda
-        );
-      }
-    );
+  // ========================================
+  // INTERFAZ
+  // ========================================
 
   return (
-    <PlantillaPagina
-      titulo="Órdenes"
-    >
+
+    <PlantillaPagina titulo="Órdenes">
 
       <BarraFiltros
         busqueda={busqueda}
-        onBusqueda={
-          setBusqueda
-        }
+        onBusqueda={setBusqueda}
         placeholder="Buscar por N° de orden o cliente"
         etiqueta="Buscar órdenes"
       >
@@ -94,29 +112,62 @@ function SellerOrdenes() {
           id="filtro-estado-vendedor"
           etiqueta=""
           tipo="select"
-          aria-label="Filtrar por estado"
-          opciones={
-            ESTADOS_ORDEN
-          }
+          opciones={ESTADOS_ORDEN}
           placeholder="Todos los estados"
-          valor={
-            estado
-          }
-          onCambio={
-            (e) =>
-              setEstado(
-                e.target.value
-              )
+          valor={estado}
+          onCambio={(evento) =>
+            setEstado(evento.target.value)
           }
         />
 
       </BarraFiltros>
 
-      <TablaOrdenesSeller
-        ordenes={
-          visibles
-        }
-      />
+      {/* CARGANDO */}
+
+      {cargando && (
+        <Alert variant="info">
+          <Spinner
+            animation="border"
+            size="sm"
+            className="me-2"
+          />
+          Consultando órdenes...
+        </Alert>
+      )}
+
+      {/* ERRORES DE CONEXIÓN O PERMISOS */}
+
+      {!cargando && error && (
+        <Alert variant="danger">
+
+          <strong>
+            No fue posible consultar las órdenes.
+          </strong>
+
+          <div className="mt-2">
+            {error}
+          </div>
+
+          <Button
+            type="button"
+            variant="outline-danger"
+            size="sm"
+            className="mt-3"
+            onClick={reintentar}
+          >
+            Reintentar consulta
+          </Button>
+
+        </Alert>
+      )}
+
+      {/* VISTA DE SOLO LECTURA */}
+
+      {!cargando && !error && (
+        <TablaOrdenesSeller
+          ordenes={visibles}
+        />
+      )}
 
     </PlantillaPagina>
   );

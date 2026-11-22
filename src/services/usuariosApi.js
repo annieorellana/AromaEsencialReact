@@ -1,30 +1,48 @@
 
-import { obtenerToken } from './authService';
-
-const API_URL = 'http://localhost:8080/api/v1/usuarios';
+import { apiFetch } from './apiFetch';
 
 // ==========================================
-// FUNCIÓN GENERAL PARA SOLICITUDES HTTP
+// CONFIGURACIÓN DE API
+// ==========================================
+
+const API_BASE = (
+  process.env.REACT_APP_API_URL ||
+  'http://localhost:8080/api/v1'
+).replace(/\/+$/, '');
+
+const API_URL = `${API_BASE}/usuarios`;
+
+// ==========================================
+// FUNCIÓN GENERAL PARA PETICIONES HTTP
 // ==========================================
 
 async function solicitar(ruta = '', opciones = {}) {
 
-  // Obtener token JWT de Spring Boot
-  const token = obtenerToken();
+  const headers = new Headers(
+    opciones.headers || {}
+  );
 
-  // Preparar encabezados
-  const headers = {
-    'Content-Type': 'application/json',
-    ...opciones.headers
-  };
+  headers.set(
+    'Accept',
+    'application/json'
+  );
 
-  // Agregar autorización si existe token
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  // Spring Boot necesita este encabezado
+  // para recibir correctamente los DTO JSON.
+  if (
+    opciones.body !== undefined &&
+    opciones.body !== null &&
+    !headers.has('Content-Type')
+  ) {
+    headers.set(
+      'Content-Type',
+      'application/json'
+    );
   }
 
-  // Realizar petición al backend
-  const respuesta = await fetch(
+  // apiFetch incorpora el JWT y puede
+  // renovar la sesión cuando corresponda.
+  const respuesta = await apiFetch(
     `${API_URL}${ruta}`,
     {
       ...opciones,
@@ -32,53 +50,75 @@ async function solicitar(ruta = '', opciones = {}) {
     }
   );
 
-  // ==========================================
+  // ========================================
   // MANEJO DE ERRORES
-  // ==========================================
+  // ========================================
 
   if (!respuesta.ok) {
 
-    let mensaje = `Error HTTP ${respuesta.status}`;
+    let mensaje =
+      `Error HTTP ${respuesta.status}`;
 
     try {
 
-      const datos = await respuesta.json();
+      const texto = await respuesta.text();
 
-      mensaje =
-        datos.mensaje ||
-        datos.message ||
-        datos.detail ||
-        mensaje;
+      if (texto) {
+
+        try {
+
+          const datos = JSON.parse(texto);
+
+          if (typeof datos === 'string') {
+            mensaje = datos;
+          } else {
+            mensaje =
+              datos?.mensaje ||
+              datos?.message ||
+              datos?.detail ||
+              datos?.error ||
+              mensaje;
+          }
+
+        } catch {
+          mensaje = texto;
+        }
+      }
 
     } catch {
-      // La respuesta puede no contener JSON.
+      // No fue posible leer la respuesta.
     }
 
     if (respuesta.status === 401) {
-      mensaje = 'Debes iniciar sesión nuevamente.';
+      mensaje =
+        'Tu sesión ha vencido. Inicia sesión nuevamente.';
     }
 
     if (respuesta.status === 403) {
       mensaje =
-        'No tienes permisos para administrar usuarios. ' +
-        'Se requiere una sesión de administrador válida en Spring Boot.';
+        'No tienes permisos para administrar usuarios.';
     }
 
     const error = new Error(mensaje);
+
     error.status = respuesta.status;
 
     throw error;
   }
 
-  // Respuesta sin contenido
+  // ========================================
+  // RESPUESTA EXITOSA
+  // ========================================
+
   if (respuesta.status === 204) {
     return null;
   }
 
-  // Convertir respuesta a JSON
   const texto = await respuesta.text();
 
-  return texto ? JSON.parse(texto) : null;
+  return texto
+    ? JSON.parse(texto)
+    : null;
 }
 
 // ==========================================
@@ -86,7 +126,10 @@ async function solicitar(ruta = '', opciones = {}) {
 // ==========================================
 
 export function listarUsuariosApi() {
-  return solicitar();
+
+  return solicitar('', {
+    method: 'GET'
+  });
 }
 
 // ==========================================
@@ -94,8 +137,12 @@ export function listarUsuariosApi() {
 // ==========================================
 
 export function buscarUsuarioApi(id) {
+
   return solicitar(
-    `/${encodeURIComponent(id)}`
+    `/${encodeURIComponent(id)}`,
+    {
+      method: 'GET'
+    }
   );
 }
 
@@ -104,8 +151,10 @@ export function buscarUsuarioApi(id) {
 // ==========================================
 
 export function crearUsuarioApi(usuario) {
+
   return solicitar('', {
     method: 'POST',
+
     body: JSON.stringify(usuario)
   });
 }
@@ -114,11 +163,16 @@ export function crearUsuarioApi(usuario) {
 // PUT - ACTUALIZAR USUARIO
 // ==========================================
 
-export function actualizarUsuarioApi(id, usuario) {
+export function actualizarUsuarioApi(
+  id,
+  usuario
+) {
+
   return solicitar(
     `/${encodeURIComponent(id)}`,
     {
       method: 'PUT',
+
       body: JSON.stringify(usuario)
     }
   );
@@ -129,6 +183,7 @@ export function actualizarUsuarioApi(id, usuario) {
 // ==========================================
 
 export function eliminarUsuarioApi(id) {
+
   return solicitar(
     `/${encodeURIComponent(id)}`,
     {

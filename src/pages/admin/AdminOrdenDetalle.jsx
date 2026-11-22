@@ -1,33 +1,18 @@
-import React, {
-  useEffect,
-  useState
-} from 'react';
 
-import {
-  Row,
-  Col
-} from 'react-bootstrap';
-
-import {
-  Link,
-  useParams
-} from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { Row, Col } from 'react-bootstrap';
+import { Link, useParams } from 'react-router-dom';
 
 import PlantillaPagina
   from '../../components/templates/admin/PlantillaPagina';
-
 import Alerta
   from '../../components/atoms/Alerta';
-
 import EstadoOrdenBadge
   from '../../components/molecules/admin/EstadoOrdenBadge';
-
 import BoletaOrden
   from '../../components/organisms/admin/BoletaOrden';
-
 import ResumenPagoOrden
   from '../../components/organisms/admin/ResumenPagoOrden';
-
 import FormularioEstadoOrden
   from '../../components/organisms/admin/FormularioEstadoOrden';
 
@@ -36,170 +21,96 @@ import {
   actualizarEstadoOrden
 } from '../../services/orderService';
 
+// ==========================================
+// ADAPTAR BOLETA REAL DE SPRING BOOT
+// ==========================================
+
+function adaptarBoleta(boleta) {
+  if (!boleta) return null;
+
+  const detalles = Array.isArray(boleta.detalles)
+    ? boleta.detalles
+    : [];
+
+  return {
+    ...boleta,
+
+    cliente: {
+      nombre: boleta.nombreCliente || '',
+      apellido: '',
+      correo: boleta.correoCliente || '',
+      telefono: boleta.telefono || '',
+      envio: boleta.metodoEnvio || '',
+      direccion: boleta.direccionEnvio || '',
+      region: boleta.region || '',
+      comuna: boleta.comuna || ''
+    },
+
+    productos: detalles.map((detalle) => ({
+      id: detalle.productoId,
+      detalleId: detalle.id,
+      codigo: detalle.codigoProducto,
+      nombre: detalle.nombreProducto,
+      cantidad: detalle.cantidad,
+      precio: detalle.precioUnitario,
+      subtotal: detalle.subtotal
+    }))
+  };
+}
+
+// ==========================================
+// DETALLE DE ORDEN - ADMINISTRADOR
+// ==========================================
+
 function AdminOrdenDetalle() {
   const { id } = useParams();
 
-  const [
-    orden,
-    setOrden
-  ] = useState(null);
+  const [orden, setOrden] = useState(null);
+  const [cargando, setCargando] = useState(true);
+  const [actualizando, setActualizando] = useState(false);
+  const [error, setError] = useState('');
 
-  const [
-    cargando,
-    setCargando
-  ] = useState(true);
-
-  const [
-    error,
-    setError
-  ] = useState('');
-
-  const [
-    actualizando,
-    setActualizando
-  ] = useState(false);
+  const actualizacionEnCurso = useRef(false);
 
   // ========================================
-  // ADAPTAR RESPUESTA DEL BACKEND
-  // ========================================
-
-  const adaptarOrden = (
-    ordenBackend
-  ) => {
-    if (!ordenBackend) {
-      return null;
-    }
-
-    const detalles =
-      Array.isArray(
-        ordenBackend.detalles
-      )
-        ? ordenBackend.detalles
-        : [];
-
-    return {
-      ...ordenBackend,
-
-      // COMPATIBILIDAD CON
-      // COMPONENTES ANTIGUOS
-      cliente: {
-        nombre:
-          ordenBackend.nombreCliente ||
-          '',
-
-        apellido:
-          '',
-
-        correo:
-          ordenBackend.correoCliente ||
-          '',
-
-        telefono:
-          ordenBackend.telefono ||
-          '',
-
-        envio:
-          ordenBackend.metodoEnvio ||
-          '',
-
-        direccion:
-          ordenBackend.direccionEnvio ||
-          '',
-
-        region:
-          ordenBackend.region ||
-          '',
-
-        comuna:
-          ordenBackend.comuna ||
-          ''
-      },
-
-      productos:
-        detalles.map(
-          (detalle) => ({
-            id:
-              detalle.productoId,
-
-            detalleId:
-              detalle.id,
-
-            codigo:
-              detalle.codigoProducto,
-
-            nombre:
-              detalle.nombreProducto,
-
-            cantidad:
-              detalle.cantidad,
-
-            precio:
-              detalle.precioUnitario,
-
-            subtotal:
-              detalle.subtotal
-          })
-        )
-    };
-  };
-
-  // ========================================
-  // CARGAR DETALLE DE LA BOLETA
-  // ========================================
+  // CONSULTAR BOLETA EN MYSQL
+  // ==========================================
 
   useEffect(() => {
     let activo = true;
 
-    const cargarOrden = async () => {
+    async function cargar() {
+      setCargando(true);
+      setError('');
+      setOrden(null);
+
       try {
-        setCargando(true);
-        setError('');
+        const boleta = await obtenerOrdenPorId(id);
 
-        const respuesta =
-          await obtenerOrdenPorId(
-            id
+        if (!activo) return;
+
+        if (!boleta?.id) {
+          throw new Error(
+            'La boleta no existe o no se pudo consultar.'
           );
-
-        if (!activo) {
-          return;
         }
 
-        if (!respuesta) {
-          setOrden(null);
-
-          setError(
-            'No fue posible encontrar la orden.'
-          );
-
-          return;
-        }
-
-        setOrden(
-          adaptarOrden(
-            respuesta
-          )
-        );
+        setOrden(adaptarBoleta(boleta));
 
       } catch (err) {
-        console.error(
-          'Error al cargar la orden:',
-          err
-        );
-
         if (activo) {
           setError(
-            'No fue posible cargar la orden.'
+            err.message ||
+            'No fue posible consultar la boleta.'
           );
         }
 
       } finally {
-        if (activo) {
-          setCargando(false);
-        }
+        if (activo) setCargando(false);
       }
-    };
+    }
 
-    cargarOrden();
+    cargar();
 
     return () => {
       activo = false;
@@ -207,102 +118,97 @@ function AdminOrdenDetalle() {
   }, [id]);
 
   // ========================================
-  // CAMBIAR ESTADO
-  // ========================================
+  // ACTUALIZAR ESTADO CON JWT
+  // ==========================================
 
-  const guardarEstado =
-    async (nuevoEstado) => {
+  const guardarEstado = async (nuevoEstado) => {
+    if (!orden?.id || actualizacionEnCurso.current) {
+      return false;
+    }
 
-      if (
-        !orden ||
-        actualizando
-      ) {
-        return false;
+    const estado = String(nuevoEstado || '')
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase()
+      .replace(/\s+/g, '_');
+
+    if (estado === orden.estado) {
+      return false;
+    }
+
+    actualizacionEnCurso.current = true;
+    setActualizando(true);
+    setError('');
+
+    try {
+      const respuesta = await actualizarEstadoOrden(
+        orden.id,
+        estado
+      );
+
+      if (!respuesta?.id) {
+        throw new Error(
+          'Spring Boot no confirmó el cambio de estado.'
+        );
       }
 
-      try {
-        setActualizando(true);
-        setError('');
+      // Utilizar la respuesta definitiva del backend.
+      setOrden(adaptarBoleta(respuesta));
+      return true;
 
-        const actualizada =
-          await actualizarEstadoOrden(
-            orden.id,
-            nuevoEstado
-          );
+    } catch (err) {
+      console.error('Error al cambiar estado:', err);
 
-        if (!actualizada) {
-          setError(
-            'No fue posible actualizar el estado de la orden.'
-          );
+      setError(
+        err.message ||
+        'No fue posible actualizar el estado.'
+      );
 
-          return false;
-        }
+      return false;
 
-        setOrden(
-          adaptarOrden(
-            actualizada
-          )
-        );
-
-        return true;
-
-      } catch (err) {
-        console.error(
-          'Error al cambiar estado:',
-          err
-        );
-
-        setError(
-          'No fue posible actualizar el estado de la orden.'
-        );
-
-        return false;
-
-      } finally {
-        setActualizando(false);
-      }
-    };
+    } finally {
+      actualizacionEnCurso.current = false;
+      setActualizando(false);
+    }
+  };
 
   // ========================================
-  // CARGANDO
-  // ========================================
+  // PANTALLA DE CARGA
+  // ==========================================
 
   if (cargando) {
     return (
       <Alerta variant="info">
-        Cargando orden...
+        Consultando boleta en MySQL...
       </Alerta>
     );
   }
 
   // ========================================
-  // ERROR / ORDEN NO ENCONTRADA
-  // ========================================
+  // BOLETA NO DISPONIBLE
+  // ==========================================
 
   if (!orden) {
     return (
-      <Alerta variant="warning">
-
-        {error ||
-          'Orden no encontrada.'}
-
-        {' '}
+      <PlantillaPagina titulo="Detalle de boleta">
+        <Alerta variant="warning">
+          {error || 'Boleta no encontrada.'}
+        </Alerta>
 
         <Link to="/admin/ordenes">
           Volver a órdenes
         </Link>
-
-      </Alerta>
+      </PlantillaPagina>
     );
   }
 
   // ========================================
-  // VISTA
-  // ========================================
+  // VISTA DE ADMINISTRADOR
+  // ==========================================
 
   return (
     <>
-
       <Link
         to="/admin/ordenes"
         className="small"
@@ -311,20 +217,12 @@ function AdminOrdenDetalle() {
       </Link>
 
       <div className="mt-3">
-
         <PlantillaPagina
-          titulo={
-            `Boleta ${orden.id}`
-          }
+          titulo={`Boleta N° ${orden.id}`}
           acciones={
-            <EstadoOrdenBadge
-              estado={
-                orden.estado
-              }
-            />
+            <EstadoOrdenBadge estado={orden.estado} />
           }
         >
-
           {error && (
             <Alerta variant="danger">
               {error}
@@ -332,41 +230,22 @@ function AdminOrdenDetalle() {
           )}
 
           <Row className="g-3">
-
             <Col lg={8}>
-
-              <BoletaOrden
-                orden={orden}
-              />
-
+              <BoletaOrden orden={orden} />
             </Col>
 
             <Col lg={4}>
-
-              <ResumenPagoOrden
-                orden={orden}
-              />
+              <ResumenPagoOrden orden={orden} />
 
               <FormularioEstadoOrden
-                estadoActual={
-                  orden.estado
-                }
-                onGuardar={
-                  guardarEstado
-                }
-                disabled={
-                  actualizando
-                }
+                estadoActual={orden.estado}
+                onGuardar={guardarEstado}
+                disabled={actualizando}
               />
-
             </Col>
-
           </Row>
-
         </PlantillaPagina>
-
       </div>
-
     </>
   );
 }

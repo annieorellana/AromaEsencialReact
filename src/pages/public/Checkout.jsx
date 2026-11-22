@@ -1,7 +1,5 @@
-import React, {
-  useEffect,
-  useState
-} from 'react';
+
+import React, { useEffect, useRef, useState } from 'react';
 
 import {
   Container,
@@ -37,7 +35,6 @@ const regionesComunas = {
     'San Bernardo',
     'Peñalolén'
   ],
-
   'Región de la Araucanía': [
     'Temuco',
     'Villarrica',
@@ -46,7 +43,6 @@ const regionesComunas = {
     'Victoria',
     'Padre Las Casas'
   ],
-
   'Región de Ñuble': [
     'Chillán',
     'Chillán Viejo',
@@ -58,161 +54,140 @@ const regionesComunas = {
 
 // ==========================================
 // CUPONES
+// El cálculo definitivo lo hace Spring Boot.
 // ==========================================
 
-const descuentos = {
+const DESCUENTOS = {
   AROMA10: 0.10,
   BIENVENIDA15: 0.15
 };
+
+const FORMULARIO_INICIAL = {
+  nombre: '',
+  apellido: '',
+  correo: '',
+  telefono: '',
+  direccion: '',
+  departamento: '',
+  region: '',
+  comuna: '',
+  indicaciones: '',
+  envio: 'domicilio',
+  metodoPago: 'debito'
+};
+
+const formatoPrecio = (valor) =>
+  new Intl.NumberFormat('es-CL', {
+    style: 'currency',
+    currency: 'CLP',
+    maximumFractionDigits: 0
+  }).format(valor || 0);
 
 // ==========================================
 // COMPONENTE CHECKOUT
 // ==========================================
 
-function Checkout({
-  carrito = [],
-  finalizarCompra
-}) {
+function Checkout({ carrito = [], finalizarCompra }) {
+
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { usuario } = useAuth();
-
-  const cupon =
-    location.state?.cupon || '';
-
-  // ========================================
-  // DATOS DEL FORMULARIO
-  // ========================================
+  const { usuario, verificandoSesion } = useAuth();
 
   const [datos, setDatos] = useState({
-    nombre: '',
-    apellido: '',
-    correo: '',
-    telefono: '',
-    direccion: '',
-    departamento: '',
-    region: '',
-    comuna: '',
-    indicaciones: '',
-    envio: 'domicilio',
-    metodoPago: 'debito'
+    ...FORMULARIO_INICIAL
   });
 
-  const [error, setError] =
-    useState('');
+  const [error, setError] = useState('');
+  const [procesando, setProcesando] = useState(false);
 
-  const [procesando, setProcesando] =
-    useState(false);
+  // Evitar dos compras simultáneas.
+  const procesandoRef = useRef(false);
 
-  // ========================================
-  // COMPLETAR DATOS DEL USUARIO
-  // ========================================
+  // Evitar sobrescribir datos cuando se renueva JWT.
+  const usuarioCompletadoRef = useRef(null);
+
+  const cupon = String(
+    location.state?.cupon || ''
+  ).trim().toUpperCase();
+
+  // ==========================================
+  // DATOS DEL USUARIO AUTENTICADO
+  // ==========================================
 
   useEffect(() => {
-    if (!usuario) {
+
+    if (!usuario?.id) {
       return;
     }
 
+    if (usuarioCompletadoRef.current === usuario.id) {
+      return;
+    }
+
+    usuarioCompletadoRef.current = usuario.id;
+
+    const regionUsuario = usuario.region || '';
+
+    const regionValida =
+      Object.prototype.hasOwnProperty.call(
+        regionesComunas,
+        regionUsuario
+      );
+
+    const comunaUsuario = usuario.comuna || '';
+
     setDatos((anterior) => ({
       ...anterior,
-
-      nombre:
-        usuario.nombre || '',
-
-      apellido:
-        usuario.apellido || '',
-
-      correo:
-        usuario.correo || '',
-
-      telefono:
-        usuario.telefono || '',
-
-      direccion:
-        usuario.direccion || '',
-
-      region:
-        usuario.region || '',
-
+      nombre: usuario.nombre || '',
+      apellido: usuario.apellido || '',
+      correo: usuario.correo || '',
+      telefono: usuario.telefono || '',
+      direccion: usuario.direccion || '',
+      region: regionValida ? regionUsuario : '',
       comuna:
-        usuario.comuna || ''
+        regionValida &&
+        regionesComunas[regionUsuario].includes(comunaUsuario)
+          ? comunaUsuario
+          : ''
     }));
 
   }, [usuario]);
 
-  // ========================================
-  // COMUNAS SEGÚN REGIÓN
-  // ========================================
+  // ==========================================
+  // CÁLCULOS VISUALES
+  // ==========================================
+
+  const subtotal = carrito.reduce(
+    (acumulado, producto) =>
+      acumulado +
+      Number(producto.precio || 0) *
+      Number(producto.cantidad || 0),
+    0
+  );
+
+  const porcentajeDescuento =
+    DESCUENTOS[cupon] || 0;
+
+  const descuento = Math.round(
+    subtotal * porcentajeDescuento
+  );
+
+  const costoEnvio =
+    datos.envio === 'domicilio' ? 3990 : 0;
+
+  const total =
+    subtotal - descuento + costoEnvio;
 
   const comunasDisponibles =
     regionesComunas[datos.region] || [];
 
-  // ========================================
-  // SUBTOTAL
-  // ========================================
+  // ==========================================
+  // FORMULARIO
+  // ==========================================
 
-  const subtotal = carrito.reduce(
-    (total, producto) =>
-      total +
-      producto.precio *
-        producto.cantidad,
-    0
-  );
-
-  // ========================================
-  // DESCUENTO
-  // ========================================
-
-  const porcentajeDescuento =
-    descuentos[cupon] || 0;
-
-  const descuento = Math.round(
-    subtotal *
-      porcentajeDescuento
-  );
-
-  // ========================================
-  // ENVÍO
-  // ========================================
-
-  const costoEnvio =
-    datos.envio === 'domicilio'
-      ? 3990
-      : 0;
-
-  // ========================================
-  // TOTAL
-  // ========================================
-
-  const total =
-    subtotal -
-    descuento +
-    costoEnvio;
-
-  // ========================================
-  // FORMATO DE PRECIO
-  // ========================================
-
-  const formatoPrecio = (valor) =>
-    new Intl.NumberFormat(
-      'es-CL',
-      {
-        style: 'currency',
-        currency: 'CLP',
-        maximumFractionDigits: 0
-      }
-    ).format(valor);
-
-  // ========================================
-  // CAMBIO DE FORMULARIO
-  // ========================================
-
-  const handleChange = (e) => {
-    const {
-      name,
-      value
-    } = e.target;
+  const handleChange = (evento) => {
+    const { name, value } = evento.target;
 
     setDatos((anterior) => {
       if (name === 'region') {
@@ -230,58 +205,58 @@ function Checkout({
     });
   };
 
-  // ========================================
-  // NOMBRE DEL MÉTODO DE PAGO
-  // ========================================
+  // ==========================================
+  // MÉTODO DE PAGO
+  // ==========================================
 
   const obtenerNombreMetodoPago = () => {
-    if (datos.metodoPago === 'debito') {
-      return 'Tarjeta de débito';
-    }
+    switch (datos.metodoPago) {
+      case 'debito':
+        return 'Tarjeta de débito';
 
-    if (datos.metodoPago === 'credito') {
-      return 'Tarjeta de crédito';
-    }
+      case 'credito':
+        return 'Tarjeta de crédito';
 
-    if (
-      datos.metodoPago ===
-      'transferencia'
-    ) {
-      return 'Transferencia bancaria';
-    }
+      case 'transferencia':
+        return 'Transferencia bancaria';
 
-    if (
-      datos.metodoPago ===
-      'simular-error'
-    ) {
-      return 'Pago rechazado simulado';
-    }
+      case 'simular-error':
+        return 'Pago rechazado simulado';
 
-    return '';
+      default:
+        return '';
+    }
   };
 
-  // ========================================
+  // ==========================================
   // CONFIRMAR COMPRA
-  // ========================================
+  // ==========================================
 
-  const confirmarCompra = async (e) => {
-    e.preventDefault();
+  const confirmarCompra = async (evento) => {
 
-    // EVITAR DOBLE ENVÍO
-    if (procesando) {
+    evento.preventDefault();
+
+    if (procesandoRef.current) {
       return;
     }
 
-    // VALIDAR CARRITO
-    if (carrito.length === 0) {
+    setError('');
+
+    // Comprobar sesión real.
+    if (verificandoSesion || !usuario?.id) {
       setError(
-        'Tu carrito está vacío.'
+        'Debes iniciar sesión para confirmar la compra.'
       );
-
       return;
     }
 
-    // VALIDAR COMPRADOR
+    // Comprobar carrito.
+    if (!Array.isArray(carrito) || carrito.length === 0) {
+      setError('Tu carrito está vacío.');
+      return;
+    }
+
+    // Datos de contacto.
     if (
       !datos.nombre.trim() ||
       !datos.apellido.trim() ||
@@ -290,14 +265,24 @@ function Checkout({
       setError(
         'Completa los datos obligatorios del comprador.'
       );
-
       return;
     }
 
-    // VALIDAR DESPACHO
+    // Comprobar cupón.
     if (
-      datos.envio === 'domicilio'
+      cupon &&
+      !Object.prototype.hasOwnProperty.call(
+        DESCUENTOS,
+        cupon
+      )
     ) {
+      setError('El cupón ingresado no es válido.');
+      return;
+    }
+
+    // Datos de despacho.
+    if (datos.envio === 'domicilio') {
+
       if (
         !datos.direccion.trim() ||
         !datos.region ||
@@ -306,179 +291,141 @@ function Checkout({
         setError(
           'Completa los datos de despacho.'
         );
-
         return;
       }
 
       if (
-        !regionesComunas[
-          datos.region
-        ] ||
-        !comunasDisponibles.includes(
-          datos.comuna
-        )
+        !comunasDisponibles.includes(datos.comuna)
       ) {
         setError(
           'Selecciona una región y comuna válidas.'
         );
+        return;
+      }
 
+      const direccionCompleta = [
+        datos.direccion,
+        datos.departamento,
+        datos.indicaciones
+      ].filter(Boolean).join(', ');
+
+      if (direccionCompleta.length > 200) {
+        setError(
+          'La dirección e indicaciones superan el máximo de 200 caracteres.'
+        );
         return;
       }
     }
 
-    setError('');
+    if (typeof finalizarCompra !== 'function') {
+      setError(
+        'La función de finalizar compra no está configurada.'
+      );
+      return;
+    }
 
     // ======================================
-    // ORDEN DEL FRONTEND
+    // DATOS PARA EL SERVICIO DE BOLETAS
     // ======================================
+
+    // No generamos el ID de la boleta en React.
+    // El identificador lo genera MySQL.
 
     const orden = {
-      id:
-        `AE-${Date.now()}`,
-
-      fecha:
-        new Date().toISOString(),
-
       cliente: {
         ...datos
       },
 
-      productos:
-        carrito.map(
-          (producto) => ({
-            ...producto
-          })
-        ),
+      productos: carrito.map((producto) => ({
+        ...producto
+      })),
 
-      cupon,
+      cupon: cupon || null,
 
-      subtotal,
-
-      descuento,
-
-      costoEnvio,
-
-      total,
-
-      metodoPago:
-        obtenerNombreMetodoPago(),
-
-      tarjeta:
-        datos.metodoPago === 'debito' ||
-        datos.metodoPago === 'credito'
-          ? {
-              tipo:
-                datos.metodoPago ===
-                'debito'
-                  ? 'Débito'
-                  : 'Crédito',
-
-              titular:
-                'RENATA ORTIZ',
-
-              numero:
-                '•••• •••• •••• 4242',
-
-              vencimiento:
-                '12/30'
-            }
-          : null,
-
-      estado:
-        'Confirmada'
+      metodoPago: obtenerNombreMetodoPago()
     };
 
     // ======================================
     // PAGO RECHAZADO SIMULADO
     // ======================================
 
-    if (
-      datos.metodoPago ===
-      'simular-error'
-    ) {
-      navigate(
-        '/compra-error',
-        {
-          state: {
-            orden: {
-              ...orden,
-              estado:
-                'Rechazada'
-            }
+    if (datos.metodoPago === 'simular-error') {
+
+      // No llamar a la API.
+      // No crear boleta.
+      // No descontar stock.
+
+      navigate('/compra-error', {
+        state: {
+          orden: {
+            ...orden,
+            id: 'No emitida (simulación)',
+            fecha: new Date().toISOString(),
+            estado: 'RECHAZADA',
+            subtotal,
+            descuento,
+            costoEnvio,
+            total
           }
         }
-      );
+      });
 
       return;
     }
 
     // ======================================
-    // COMPRA EXITOSA - API BACKEND
+    // COMPRA REAL EN SPRING BOOT
     // ======================================
 
+    procesandoRef.current = true;
+    setProcesando(true);
+
     try {
-      if (
-        typeof finalizarCompra !==
-        'function'
-      ) {
+
+      const resultado = await finalizarCompra(orden);
+
+      // Comprobar respuesta del backend.
+      if (!resultado?.id) {
         throw new Error(
-          'No está configurada la función para finalizar la compra.'
+          'El backend no confirmó la creación de la boleta.'
         );
       }
 
-      setProcesando(true);
+      // El backend devuelve la boleta definitiva
+      // con ID, totales, estado y detalles.
 
-      // ESPERAR RESPUESTA REAL
-      // DEL BACKEND
-      const resultado =
-        await finalizarCompra(
-          orden
-        );
-
-      if (!resultado) {
-        throw new Error(
-          'No se pudo guardar la compra.'
-        );
-      }
-
-      // IR A COMPRA EXITOSA
-      // CON LA BOLETA REAL DEVUELTA
-      // POR SPRING BOOT
-      navigate(
-        '/compra-exitosa',
-        {
-          state: {
-            orden: resultado
-          }
-        }
-      );
+      navigate('/compra-exitosa', {
+        state: {
+          orden: resultado
+        },
+        replace: true
+      });
 
     } catch (err) {
+
       console.error(
-        'Error al confirmar la compra:',
+        'Error al confirmar compra:',
         err
       );
 
       setError(
         err.message ||
-        'No se pudo confirmar la compra.'
+        'No fue posible confirmar la compra.'
       );
 
     } finally {
+      procesandoRef.current = false;
       setProcesando(false);
     }
   };
 
-  // ========================================
+  // ==========================================
   // CARRITO VACÍO
-  // ========================================
+  // ==========================================
 
-  if (
-    carrito.length === 0
-  ) {
+  if (carrito.length === 0) {
     return (
       <Container className="py-5">
-
         <Alert variant="info">
           Tu carrito está vacío.
         </Alert>
@@ -486,14 +433,13 @@ function Checkout({
         <Link to="/productos">
           Volver a productos
         </Link>
-
       </Container>
     );
   }
 
-  // ========================================
-  // VISTA
-  // ========================================
+  // ==========================================
+  // VISTA PRINCIPAL
+  // ==========================================
 
   return (
     <Container className="py-5">
@@ -504,26 +450,27 @@ function Checkout({
 
       <Row className="g-4">
 
-        {/* =================================
-            FORMULARIO
-           ================================= */}
+        {/* FORMULARIO */}
 
         <Col lg={8}>
-
           <Card className="shadow-sm">
-
             <Card.Body className="p-4">
 
               <h4 className="mb-4">
                 Información del comprador
               </h4>
 
-              {usuario && (
+              {usuario?.id ? (
                 <Alert variant="success">
-                  Has iniciado sesión.{' '}
-                  Tus datos disponibles
-                  se completaron
-                  automáticamente.
+                  Sesión iniciada como{' '}
+                  <strong>
+                    {usuario.correo}
+                  </strong>.
+                  La compra se asociará a tu cuenta.
+                </Alert>
+              ) : (
+                <Alert variant="warning">
+                  Debes iniciar sesión para comprar.
                 </Alert>
               )}
 
@@ -535,77 +482,49 @@ function Checkout({
 
               <Form
                 id="form-checkout"
-                onSubmit={
-                  confirmarCompra
-                }
+                onSubmit={confirmarCompra}
               >
 
-                {/* =========================
-                    NOMBRE Y APELLIDO
-                   ========================= */}
+                {/* NOMBRE Y APELLIDO */}
 
                 <Row>
-
                   <Col md={6}>
-
                     <Form.Group className="mb-3">
-
                       <Form.Label>
                         Nombre *
                       </Form.Label>
 
                       <Form.Control
                         name="nombre"
-                        value={
-                          datos.nombre
-                        }
-                        onChange={
-                          handleChange
-                        }
-                        disabled={
-                          procesando
-                        }
+                        value={datos.nombre}
+                        onChange={handleChange}
+                        readOnly={Boolean(usuario?.nombre)}
+                        disabled={procesando}
                         required
                       />
-
                     </Form.Group>
-
                   </Col>
 
                   <Col md={6}>
-
                     <Form.Group className="mb-3">
-
                       <Form.Label>
                         Apellido *
                       </Form.Label>
 
                       <Form.Control
                         name="apellido"
-                        value={
-                          datos.apellido
-                        }
-                        onChange={
-                          handleChange
-                        }
-                        disabled={
-                          procesando
-                        }
+                        value={datos.apellido}
+                        onChange={handleChange}
+                        disabled={procesando}
                         required
                       />
-
                     </Form.Group>
-
                   </Col>
-
                 </Row>
 
-                {/* =========================
-                    CORREO
-                   ========================= */}
+                {/* CORREO */}
 
                 <Form.Group className="mb-3">
-
                   <Form.Label>
                     Correo electrónico *
                   </Form.Label>
@@ -613,27 +532,18 @@ function Checkout({
                   <Form.Control
                     type="email"
                     name="correo"
-                    value={
-                      datos.correo
-                    }
-                    onChange={
-                      handleChange
-                    }
+                    value={datos.correo}
+                    onChange={handleChange}
+                    readOnly={Boolean(usuario?.correo)}
+                    disabled={procesando}
                     maxLength={100}
-                    disabled={
-                      procesando
-                    }
                     required
                   />
-
                 </Form.Group>
 
-                {/* =========================
-                    TELÉFONO
-                   ========================= */}
+                {/* TELÉFONO */}
 
                 <Form.Group className="mb-3">
-
                   <Form.Label>
                     Teléfono
                   </Form.Label>
@@ -641,24 +551,15 @@ function Checkout({
                   <Form.Control
                     type="tel"
                     name="telefono"
-                    value={
-                      datos.telefono
-                    }
-                    onChange={
-                      handleChange
-                    }
-                    maxLength={15}
+                    value={datos.telefono}
+                    onChange={handleChange}
+                    disabled={procesando}
+                    maxLength={20}
                     placeholder="+56912345678"
-                    disabled={
-                      procesando
-                    }
                   />
-
                 </Form.Group>
 
-                {/* =========================
-                    ENTREGA
-                   ========================= */}
+                {/* TIPO DE ENTREGA */}
 
                 <h5 className="mt-4 mb-3">
                   Tipo de entrega
@@ -666,216 +567,135 @@ function Checkout({
 
                 <Form.Select
                   name="envio"
-                  value={
-                    datos.envio
-                  }
-                  onChange={
-                    handleChange
-                  }
+                  value={datos.envio}
+                  onChange={handleChange}
+                  disabled={procesando}
                   className="mb-3"
-                  disabled={
-                    procesando
-                  }
                 >
-
                   <option value="domicilio">
                     Despacho a domicilio
                   </option>
-
                   <option value="retiro">
                     Retiro en tienda
                   </option>
-
                 </Form.Select>
 
-                {/* =========================
-                    DIRECCIÓN
-                   ========================= */}
+                {/* DIRECCIÓN */}
 
-                {datos.envio ===
-                  'domicilio' && (
+                {datos.envio === 'domicilio' && (
                   <>
-
                     <h5 className="mt-4 mb-3">
                       Dirección de entrega
                     </h5>
 
                     <Form.Group className="mb-3">
-
                       <Form.Label>
                         Calle y número *
                       </Form.Label>
 
                       <Form.Control
                         name="direccion"
-                        value={
-                          datos.direccion
-                        }
-                        onChange={
-                          handleChange
-                        }
+                        value={datos.direccion}
+                        onChange={handleChange}
+                        disabled={procesando}
                         placeholder="Ej: Los Aromos 123"
-                        disabled={
-                          procesando
-                        }
                         required
                       />
-
                     </Form.Group>
 
                     <Form.Group className="mb-3">
-
                       <Form.Label>
-                        Departamento{' '}
-                        (opcional)
+                        Departamento (opcional)
                       </Form.Label>
 
                       <Form.Control
                         name="departamento"
-                        value={
-                          datos.departamento
-                        }
-                        onChange={
-                          handleChange
-                        }
-                        placeholder="Ej: Depto 503"
-                        disabled={
-                          procesando
-                        }
+                        value={datos.departamento}
+                        onChange={handleChange}
+                        disabled={procesando}
                       />
-
                     </Form.Group>
 
                     <Form.Group className="mb-3">
-
                       <Form.Label>
                         Región *
                       </Form.Label>
 
                       <Form.Select
                         name="region"
-                        value={
-                          datos.region
-                        }
-                        onChange={
-                          handleChange
-                        }
-                        disabled={
-                          procesando
-                        }
+                        value={datos.region}
+                        onChange={handleChange}
+                        disabled={procesando}
                         required
                       >
-
                         <option value="">
                           Seleccione una región
                         </option>
 
-                        {Object.keys(
-                          regionesComunas
-                        ).map(
+                        {Object.keys(regionesComunas).map(
                           (region) => (
                             <option
-                              key={
-                                region
-                              }
-                              value={
-                                region
-                              }
+                              key={region}
+                              value={region}
                             >
                               {region}
                             </option>
                           )
                         )}
-
                       </Form.Select>
-
                     </Form.Group>
 
                     <Form.Group className="mb-3">
-
                       <Form.Label>
                         Comuna *
                       </Form.Label>
 
                       <Form.Select
                         name="comuna"
-                        value={
-                          comunasDisponibles.includes(
-                            datos.comuna
-                          )
-                            ? datos.comuna
-                            : ''
-                        }
-                        onChange={
-                          handleChange
-                        }
+                        value={datos.comuna}
+                        onChange={handleChange}
                         disabled={
                           procesando ||
-                          comunasDisponibles.length ===
-                            0
+                          comunasDisponibles.length === 0
                         }
                         required
                       >
-
                         <option value="">
-
-                          {comunasDisponibles.length ===
-                          0
-                            ? 'Primero seleccione una región'
-                            : 'Seleccione una comuna'}
-
+                          Seleccione una comuna
                         </option>
 
                         {comunasDisponibles.map(
                           (comuna) => (
                             <option
-                              key={
-                                comuna
-                              }
-                              value={
-                                comuna
-                              }
+                              key={comuna}
+                              value={comuna}
                             >
                               {comuna}
                             </option>
                           )
                         )}
-
                       </Form.Select>
-
                     </Form.Group>
 
                     <Form.Group className="mb-3">
-
                       <Form.Label>
-                        Indicaciones de entrega{' '}
-                        (opcional)
+                        Indicaciones (opcional)
                       </Form.Label>
 
                       <Form.Control
                         as="textarea"
                         rows={3}
                         name="indicaciones"
-                        value={
-                          datos.indicaciones
-                        }
-                        onChange={
-                          handleChange
-                        }
+                        value={datos.indicaciones}
+                        onChange={handleChange}
+                        disabled={procesando}
                         placeholder="Ej: Entregar en conserjería"
-                        disabled={
-                          procesando
-                        }
                       />
-
                     </Form.Group>
-
                   </>
                 )}
 
-                {/* =========================
-                    MÉTODO DE PAGO
-                   ========================= */}
+                {/* MÉTODO DE PAGO */}
 
                 <h5 className="mt-4 mb-3">
                   Método de pago
@@ -883,18 +703,11 @@ function Checkout({
 
                 <Form.Select
                   name="metodoPago"
-                  value={
-                    datos.metodoPago
-                  }
-                  onChange={
-                    handleChange
-                  }
+                  value={datos.metodoPago}
+                  onChange={handleChange}
+                  disabled={procesando}
                   className="mb-3"
-                  disabled={
-                    procesando
-                  }
                 >
-
                   <option value="debito">
                     Tarjeta de débito
                   </option>
@@ -910,196 +723,86 @@ function Checkout({
                   <option value="simular-error">
                     Simular pago rechazado
                   </option>
-
                 </Form.Select>
 
-                {/* =========================
-                    DATOS DE TARJETA
-                   ========================= */}
+                {/* TARJETAS SIMULADAS */}
 
-                {(datos.metodoPago ===
-                  'debito' ||
-                  datos.metodoPago ===
-                  'credito') && (
-
+                {['debito', 'credito'].includes(
+                  datos.metodoPago
+                ) && (
                   <Card className="mb-3 bg-light">
-
                     <Card.Body>
-
-                      <h6 className="mb-3">
-                        Datos de tarjeta{' '}
-                        - Simulación
+                      <h6>
+                        Datos de tarjeta — Simulación
                       </h6>
 
-                      <Form.Group className="mb-3">
-
-                        <Form.Label>
-                          Tipo de tarjeta
-                        </Form.Label>
-
-                        <Form.Control
-                          value={
-                            datos.metodoPago ===
-                            'debito'
-                              ? 'Tarjeta de débito'
-                              : 'Tarjeta de crédito'
-                          }
-                          readOnly
-                        />
-
-                      </Form.Group>
-
-                      <Form.Group className="mb-3">
-
-                        <Form.Label>
-                          Número de tarjeta
-                        </Form.Label>
-
-                        <Form.Control
-                          value="4242 4242 4242 4242"
-                          readOnly
-                        />
-
-                      </Form.Group>
-
-                      <Form.Group className="mb-3">
-
-                        <Form.Label>
-                          Nombre en la tarjeta
-                        </Form.Label>
-
-                        <Form.Control
-                          value="RENATA ORTIZ"
-                          readOnly
-                        />
-
-                      </Form.Group>
-
-                      <Row>
-
-                        <Col md={6}>
-
-                          <Form.Group className="mb-3">
-
-                            <Form.Label>
-                              Vencimiento
-                            </Form.Label>
-
-                            <Form.Control
-                              value="12/30"
-                              readOnly
-                            />
-
-                          </Form.Group>
-
-                        </Col>
-
-                        <Col md={6}>
-
-                          <Form.Group className="mb-3">
-
-                            <Form.Label>
-                              CVV
-                            </Form.Label>
-
-                            <Form.Control
-                              value="123"
-                              readOnly
-                            />
-
-                          </Form.Group>
-
-                        </Col>
-
-                      </Row>
+                      <p className="mb-1">
+                        Tipo: {obtenerNombreMetodoPago()}
+                      </p>
+                      <p className="mb-1">
+                        Número: 4242 4242 4242 4242
+                      </p>
+                      <p className="mb-1">
+                        Titular: RENATA ORTIZ
+                      </p>
+                      <p className="mb-3">
+                        Vencimiento: 12/30
+                      </p>
 
                       <Alert
                         variant="warning"
                         className="mb-0"
                       >
-                        🔒 Datos ficticios para
-                        fines académicos.
-                        No ingreses información
-                        bancaria real.
+                        Datos ficticios para fines
+                        académicos. No ingreses
+                        información bancaria real.
                       </Alert>
-
                     </Card.Body>
-
                   </Card>
                 )}
 
-                {/* =========================
-                    TRANSFERENCIA
-                   ========================= */}
+                {/* TRANSFERENCIA SIMULADA */}
 
-                {datos.metodoPago ===
-                  'transferencia' && (
-
+                {datos.metodoPago === 'transferencia' && (
                   <Alert variant="secondary">
-
                     <strong>
                       Transferencia simulada
                     </strong>
 
-                    <br />
-
-                    Banco: Banco Demo
-
-                    <br />
-
-                    Cuenta: 123456789
-
-                    <br />
-
-                    Titular: AromaEsencial
-
-                    <br />
-
-                    <small>
-                      Datos ficticios para
-                      fines académicos.
-                    </small>
-
+                    <p className="mb-0">
+                      Banco: Banco Demo
+                    </p>
+                    <p className="mb-0">
+                      Cuenta: 123456789
+                    </p>
+                    <p className="mb-0">
+                      Titular: AromaEsencial
+                    </p>
                   </Alert>
                 )}
 
-                {/* =========================
-                    PAGO RECHAZADO
-                   ========================= */}
-
-                {datos.metodoPago ===
-                  'simular-error' && (
-
+                {datos.metodoPago === 'simular-error' && (
                   <Alert variant="danger">
-                    Esta opción permite
-                    demostrar el flujo de
-                    una transacción rechazada.
+                    Se simulará una transacción
+                    rechazada. No se generará boleta.
                   </Alert>
                 )}
 
                 <Alert variant="info">
-                  Esta compra es una
-                  simulación académica.{' '}
-                  No se realizará ningún
-                  cobro real.
+                  Esta compra es una simulación
+                  académica. No se realizará
+                  ningún cobro real.
                 </Alert>
 
               </Form>
-
             </Card.Body>
-
           </Card>
-
         </Col>
 
-        {/* =================================
-            RESUMEN DEL PEDIDO
-           ================================= */}
+        {/* RESUMEN DEL PEDIDO */}
 
         <Col lg={4}>
-
           <Card className="shadow-sm">
-
             <Card.Body className="p-4">
 
               <h4>
@@ -1108,112 +811,74 @@ function Checkout({
 
               <hr />
 
-              {carrito.map(
-                (producto) => (
+              {carrito.map((producto) => (
+                <div
+                  key={producto.id}
+                  className="d-flex justify-content-between mb-3"
+                >
+                  <span>
+                    {producto.nombre}
+                    {' × '}
+                    {producto.cantidad}
+                  </span>
 
-                  <div
-                    key={
-                      producto.id
-                    }
-                    className="d-flex justify-content-between mb-3"
-                  >
-
-                    <span>
-                      {producto.nombre}
-                      {' × '}
-                      {producto.cantidad}
-                    </span>
-
-                    <span>
-                      {formatoPrecio(
-                        producto.precio *
-                        producto.cantidad
-                      )}
-                    </span>
-
-                  </div>
-                )
-              )}
+                  <span>
+                    {formatoPrecio(
+                      Number(producto.precio || 0) *
+                      Number(producto.cantidad || 0)
+                    )}
+                  </span>
+                </div>
+              ))}
 
               <hr />
 
               <div className="d-flex justify-content-between mb-2">
-
-                <span>
-                  Subtotal:
-                </span>
-
+                <span>Subtotal:</span>
                 <strong>
-                  {formatoPrecio(
-                    subtotal
-                  )}
+                  {formatoPrecio(subtotal)}
                 </strong>
-
               </div>
 
               {descuento > 0 && (
-
                 <div className="d-flex justify-content-between mb-2 text-success">
-
                   <span>
-                    Descuento:
+                    Descuento ({cupon}):
                   </span>
 
                   <strong>
-                    -
-                    {formatoPrecio(
-                      descuento
-                    )}
+                    -{formatoPrecio(descuento)}
                   </strong>
-
                 </div>
               )}
 
               <div className="d-flex justify-content-between mb-2">
-
-                <span>
-                  Envío:
-                </span>
-
+                <span>Envío:</span>
                 <strong>
-                  {formatoPrecio(
-                    costoEnvio
-                  )}
+                  {formatoPrecio(costoEnvio)}
                 </strong>
-
               </div>
 
               <div className="d-flex justify-content-between mb-2">
-
-                <span>
-                  Pago:
-                </span>
-
+                <span>Pago:</span>
                 <strong>
                   {obtenerNombreMetodoPago()}
                 </strong>
-
               </div>
 
               <hr />
 
               <div className="d-flex justify-content-between">
-
+                <h5>Total estimado:</h5>
                 <h5>
-                  Total:
+                  {formatoPrecio(total)}
                 </h5>
-
-                <h5>
-                  {formatoPrecio(
-                    total
-                  )}
-                </h5>
-
               </div>
 
-              {/* =========================
-                  CONFIRMAR COMPRA
-                 ========================= */}
+              <small className="text-muted">
+                El total definitivo será
+                calculado por Spring Boot.
+              </small>
 
               <Button
                 type="submit"
@@ -1221,7 +886,9 @@ function Checkout({
                 variant="success"
                 className="w-100 mt-3"
                 disabled={
-                  procesando
+                  procesando ||
+                  verificandoSesion ||
+                  !usuario?.id
                 }
               >
                 {procesando
@@ -1234,21 +901,16 @@ function Checkout({
                 to="/carrito"
                 variant="outline-secondary"
                 className="w-100 mt-2"
-                disabled={
-                  procesando
-                }
+                disabled={procesando}
               >
                 Volver al carrito
               </Button>
 
             </Card.Body>
-
           </Card>
-
         </Col>
 
       </Row>
-
     </Container>
   );
 }
